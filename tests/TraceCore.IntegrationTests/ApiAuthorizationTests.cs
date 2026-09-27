@@ -59,6 +59,33 @@ public class ApiAuthorizationTests : IClassFixture<TestWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Investigator_CaseList_ShouldExcludeUngrantedConfidentialCase()
+    {
+        var admin = _factory.CreateAdminClient();
+        var investigator = _factory.CreateInvestigatorClient();
+
+        var createCmd = new CreateCaseCommand(
+            "List Filter Probe",
+            "Confidential case invisible to ungranted investigator.",
+            CaseType.FinancialCrime,
+            CasePriority.High,
+            ConfidentialityLevel.Confidential,
+            72,
+            DateTime.UtcNow.AddDays(7),
+            true);
+        var createRes = await admin.PostAsJsonAsync("/api/v1/cases", createCmd, JsonOptions);
+        var created = await createRes.Content.ReadFromJsonAsync<CreateCaseResult>(JsonOptions);
+
+        var invList = await investigator.GetFromJsonAsync<TraceCore.Application.Common.Models.PagedList<TraceCore.Application.Cases.CaseDto>>(
+            "/api/v1/cases?PageNumber=1&PageSize=100", JsonOptions);
+        invList!.Items.Should().NotContain(c => c.Id == created!.CaseId);
+
+        var adminList = await admin.GetFromJsonAsync<TraceCore.Application.Common.Models.PagedList<TraceCore.Application.Cases.CaseDto>>(
+            "/api/v1/cases?PageNumber=1&PageSize=100", JsonOptions);
+        adminList!.Items.Should().Contain(c => c.Id == created!.CaseId);
+    }
+
+    [Fact]
     public async Task Auditor_WithoutTaskWrite_ShouldBeForbidden()
     {
         var auditor = _factory.CreateAuditorClient();

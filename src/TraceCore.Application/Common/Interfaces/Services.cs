@@ -54,16 +54,6 @@ public interface ISlaCalculationService
     double CalculateRemainingHours(DateTime deadlineUtc, DateTime currentUtc);
 }
 
-public sealed record GraphNode(Guid Id, EntityType Type, string Label, Dictionary<string, object> Attributes);
-public sealed record GraphEdge(Guid Id, Guid SourceId, EntityType SourceType, Guid TargetId, EntityType TargetType, RelationshipType RelationshipType, string Description, float Confidence);
-public sealed record GraphResult(IReadOnlyList<GraphNode> Nodes, IReadOnlyList<GraphEdge> Edges);
-
-public interface IGraphTraversalService
-{
-    Task<GraphResult> GetEgoGraphAsync(Guid entityId, EntityType entityType, int maxDepth = 2, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<Guid>> FindShortestPathAsync(Guid sourceId, EntityType sourceType, Guid targetId, EntityType targetType, int maxDepth = 5, CancellationToken cancellationToken = default);
-}
-
 public interface IDateTimeProvider
 {
     DateTime UtcNow { get; }

@@ -35,10 +35,12 @@ public sealed class SearchCasesAndEntitiesQuery : PagedRequest, IRequest<SearchS
 public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAndEntitiesQuery, SearchSummaryDto>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
 
-    public SearchCasesAndEntitiesQueryHandler(IApplicationDbContext context)
+    public SearchCasesAndEntitiesQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     {
         _context = context;
+        _currentUser = currentUser;
     }
 
     public async Task<SearchSummaryDto> Handle(SearchCasesAndEntitiesQuery request, CancellationToken cancellationToken)
@@ -71,6 +73,8 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
                 caseQuery = caseQuery.Where(c => c.CreatedAtUtc >= request.FromUtc.Value);
             if (request.ToUtc.HasValue)
                 caseQuery = caseQuery.Where(c => c.CreatedAtUtc <= request.ToUtc.Value);
+
+            caseQuery = caseQuery.WhereReadableBy(_context, _currentUser);
 
             int caseTotal = await caseQuery.CountAsync(cancellationToken);
             counts[nameof(Domain.Enums.EntityType.Case)] = caseTotal;
@@ -156,10 +160,17 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
             results.AddRange(orgs);
         }
 
-        // 4. Evidence Search
+        // 4. Evidence Search (restricted to readable cases)
         if (!request.EntityType.HasValue || request.EntityType == Domain.Enums.EntityType.Evidence)
         {
-            var evQuery = _context.Evidence.AsNoTracking();
+            var readableCaseIds = await _context.Cases
+                .WhereReadableBy(_context, _currentUser)
+                .Select(c => c.Id)
+                .Take(2000)
+                .ToListAsync(cancellationToken);
+
+            var evQuery = _context.Evidence.AsNoTracking()
+                .Where(e => readableCaseIds.Contains(e.CaseId));
             if (!string.IsNullOrEmpty(term))
             {
                 evQuery = evQuery.Where(e => e.EvidenceNumber.ToLower().Contains(term) ||

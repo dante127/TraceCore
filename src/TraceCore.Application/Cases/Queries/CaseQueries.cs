@@ -119,10 +119,12 @@ public sealed class GetCasesPagedQuery : PagedRequest, IRequest<PagedList<CaseDt
 public class GetCasesPagedQueryHandler : IRequestHandler<GetCasesPagedQuery, PagedList<CaseDto>>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
 
-    public GetCasesPagedQueryHandler(IApplicationDbContext context)
+    public GetCasesPagedQueryHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     {
         _context = context;
+        _currentUser = currentUser;
     }
 
     public async Task<PagedList<CaseDto>> Handle(GetCasesPagedQuery request, CancellationToken cancellationToken)
@@ -147,6 +149,8 @@ public class GetCasesPagedQueryHandler : IRequestHandler<GetCasesPagedQuery, Pag
                                      c.CaseNumber.ToLower().Contains(term) ||
                                      c.Description.ToLower().Contains(term));
         }
+
+        query = query.WhereReadableBy(_context, _currentUser);
 
         int totalCount = await query.CountAsync(cancellationToken);
 

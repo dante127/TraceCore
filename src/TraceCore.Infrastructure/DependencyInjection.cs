@@ -71,7 +71,6 @@ public static class DependencyInjection
         // 5. Core Services
         services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<INotificationService, NotificationService>();
-        services.AddScoped<IGraphTraversalService, GraphTraversalService>();
 
         // 6. Security
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));

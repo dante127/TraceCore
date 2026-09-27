@@ -141,6 +141,9 @@ public class DocumentsController : ApiControllerBase
             return Forbid();
 
         var stream = await _storage.GetFileStreamAsync(version.StoragePath, ct);
-        return File(stream, version.ContentType, version.FileName);
+
+        // Serve as a generic attachment: stored content types are uploader-controlled
+        // and must never execute inline in a victim's browser.
+        return File(stream, "application/octet-stream", version.FileName);
     }
 }

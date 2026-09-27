@@ -33,7 +33,6 @@ public class AuditInterceptor : SaveChangesInterceptor
         var auditEntries = new List<AuditLog>();
         var userId = _currentUser.UserId;
         var correlationId = Guid.NewGuid().ToString(); // correlation tracing
-        var timestamp = DateTime.UtcNow;
 
         foreach (var entry in eventData.Context.ChangeTracker.Entries())
         {
