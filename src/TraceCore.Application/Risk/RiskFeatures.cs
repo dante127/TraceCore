@@ -107,16 +107,12 @@ public class RiskAssessmentService : IRiskAssessmentService
         // Clamp total score
         totalScore = Math.Clamp(totalScore, 0, 100);
 
-        RiskLevel level = totalScore switch
-        {
-            >= 80 => RiskLevel.Critical,
-            >= 60 => RiskLevel.High,
-            >= 30 => RiskLevel.Medium,
-            _ => RiskLevel.Low
-        };
+        RiskLevel level = TraceCore.Domain.Entities.Cases.Case.RiskLevelForScore(totalScore);
+
+        triggerReason = string.IsNullOrWhiteSpace(triggerReason) ? "Scheduled assessment" : triggerReason.Trim();
 
         // Update Case
-        @case.UpdateRiskAssessment(totalScore, level, triggerReason);
+        @case.UpdateRiskAssessment(totalScore, triggerReason);
 
         // Record History
         string factorsJson = JsonSerializer.Serialize(factors);

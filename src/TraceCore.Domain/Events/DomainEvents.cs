@@ -77,6 +77,15 @@ public sealed record InvestigationCompletedDomainEvent(
     Guid InvestigationId,
     Guid CaseId) : BaseDomainEvent;
 
+public sealed record InvestigationSuspendedDomainEvent(
+    Guid InvestigationId,
+    Guid CaseId,
+    string Reason) : BaseDomainEvent;
+
+public sealed record InvestigationClosedDomainEvent(
+    Guid InvestigationId,
+    Guid CaseId) : BaseDomainEvent;
+
 public sealed record TaskCreatedDomainEvent(
     Guid TaskId,
     Guid CaseId,

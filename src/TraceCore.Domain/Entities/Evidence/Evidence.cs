@@ -127,6 +127,9 @@ public class Evidence : BaseEntity, IAggregateRoot
 
         Status = action switch
         {
+            CustodyAction.Collected => EvidenceStatus.Collected,
+            CustodyAction.Transferred => EvidenceStatus.Transferred,
+            CustodyAction.Received => EvidenceStatus.InCustody,
             CustodyAction.CheckedOutForAnalysis => EvidenceStatus.InAnalysis,
             CustodyAction.CheckedIn => EvidenceStatus.InCustody,
             CustodyAction.CourtPresented => EvidenceStatus.CourtExhibited,
@@ -149,7 +152,11 @@ public class Evidence : BaseEntity, IAggregateRoot
 
     public void Archive(Guid userId, string reason)
     {
-        RecordTransfer(userId, userId, CustodyAction.Archived, "Long-term Evidence Archive", reason);
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("An archive reason is required.");
+
+        RecordTransfer(userId, userId, CustodyAction.Archived, "Long-term Evidence Archive", reason.Trim());
+        AddDomainEvent(new EvidenceArchivedDomainEvent(Id, CaseId, userId, reason.Trim()));
     }
 }
 

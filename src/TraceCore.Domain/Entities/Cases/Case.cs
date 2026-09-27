@@ -208,18 +208,32 @@ public class Case : BaseEntity, IAggregateRoot
         SlaBreachedAtUtc = breachedAtUtc;
         UpdatedAtUtc = DateTime.UtcNow;
 
-        // Auto-escalate priority if currently low
+        // Auto-escalate priority if currently low, recorded as an explicit priority change
         if (Priority == CasePriority.Low)
         {
             Priority = CasePriority.Medium;
+            AddDomainEvent(new CasePriorityChangedDomainEvent(
+                Id, CaseNumber, CasePriority.Low, CasePriority.Medium, Guid.Empty, "SLA breach auto-escalation."));
         }
 
         AddDomainEvent(new CaseSlaBreachedDomainEvent(Id, CaseNumber, breachedAtUtc));
     }
 
-    public void UpdateRiskAssessment(int score, RiskLevel level, string reason)
+    public static RiskLevel RiskLevelForScore(int score) => Math.Clamp(score, 0, 100) switch
     {
+        >= 80 => RiskLevel.Critical,
+        >= 60 => RiskLevel.High,
+        >= 30 => RiskLevel.Medium,
+        _ => RiskLevel.Low
+    };
+
+    public void UpdateRiskAssessment(int score, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("A risk assessment reason is required.");
+
         int clamped = Math.Clamp(score, 0, 100);
+        var level = RiskLevelForScore(clamped);
         var oldScore = CurrentRiskScore;
         var oldLevel = CurrentRiskLevel;
 
@@ -230,12 +244,15 @@ public class Case : BaseEntity, IAggregateRoot
         // Auto-escalation rule: if risk score >= 80 (Critical) and priority is less than High, escalate
         if (clamped >= 80 && Priority < CasePriority.High)
         {
+            var oldPriority = Priority;
             Priority = CasePriority.High;
+            AddDomainEvent(new CasePriorityChangedDomainEvent(
+                Id, CaseNumber, oldPriority, CasePriority.High, Guid.Empty, $"Critical risk auto-escalation (score {clamped})."));
         }
 
         if (oldScore != clamped || oldLevel != level)
         {
-            AddDomainEvent(new CaseRiskLevelChangedDomainEvent(Id, CaseNumber, oldScore, clamped, oldLevel, level, reason));
+            AddDomainEvent(new CaseRiskLevelChangedDomainEvent(Id, CaseNumber, oldScore, clamped, oldLevel, level, reason.Trim()));
         }
     }
 

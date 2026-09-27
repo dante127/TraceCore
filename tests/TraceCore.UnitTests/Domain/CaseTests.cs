@@ -120,14 +120,15 @@ public class CaseTests
             _userId,
             168);
 
-        // Act (Critical risk score >= 80)
-        @case.UpdateRiskAssessment(85, RiskLevel.Critical, "Critical evidence and SLA breach detected.");
+        // Act (Critical risk score >= 80 derives Critical level and escalates priority)
+        @case.UpdateRiskAssessment(85, "Critical evidence and SLA breach detected.");
 
         // Assert
         @case.CurrentRiskScore.Should().Be(85);
         @case.CurrentRiskLevel.Should().Be(RiskLevel.Critical);
         @case.Priority.Should().Be(CasePriority.High); // auto-escalated
         @case.DomainEvents.Should().Contain(e => e is CaseRiskLevelChangedDomainEvent);
+        @case.DomainEvents.Should().Contain(e => e is CasePriorityChangedDomainEvent);
     }
 
     [Fact]

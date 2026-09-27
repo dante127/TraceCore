@@ -185,6 +185,7 @@ public sealed record UpdateInvestigationStatusCommand(
     Guid InvestigationId,
     InvestigationStatus NewStatus,
     string? FinalFindings = null,
+    string? Reason = null,
     string? RowVersion = null) : IRequest<Unit>;
 
 public class UpdateInvestigationStatusCommandHandler : IRequestHandler<UpdateInvestigationStatusCommand, Unit>
@@ -220,11 +221,15 @@ public class UpdateInvestigationStatusCommandHandler : IRequestHandler<UpdateInv
                 investigation.Complete(request.FinalFindings ?? investigation.Findings);
                 break;
             case InvestigationStatus.Suspended:
-                investigation.Suspend("Investigation suspended by request.");
+                investigation.Suspend(request.Reason ?? "Suspended pending review.");
                 break;
             case InvestigationStatus.Closed:
                 investigation.Close();
                 break;
+            default:
+                throw new TraceCore.Domain.Common.Exceptions.InvalidStateTransitionException(
+                    nameof(Investigation), investigation.Status.ToString(), request.NewStatus.ToString(),
+                    "Investigations cannot transition back to Planned.");
         }
 
         await _context.SaveChangesAsync(cancellationToken);

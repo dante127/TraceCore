@@ -120,13 +120,28 @@ public class DocumentVersion : BaseEntity
         Guid uploadedByUserId,
         string changeSummary) : base()
     {
+        if (documentId == Guid.Empty)
+            throw new DomainException("Document ID is required.");
+        if (versionNumber <= 0)
+            throw new DomainException("Version number must be positive.");
+        if (string.IsNullOrWhiteSpace(fileName))
+            throw new DomainException("File name is required.");
+        if (fileSizeBytes <= 0)
+            throw new DomainException("File size must be positive.");
+        if (string.IsNullOrWhiteSpace(storagePath))
+            throw new DomainException("Storage path is required.");
+        if (string.IsNullOrWhiteSpace(sha256Hash))
+            throw new DomainException("SHA-256 hash is required to guarantee file integrity.");
+        if (uploadedByUserId == Guid.Empty)
+            throw new DomainException("Uploading user is required.");
+
         DocumentId = documentId;
         VersionNumber = versionNumber;
-        FileName = fileName?.Trim() ?? "unknown.bin";
-        ContentType = contentType?.Trim() ?? "application/octet-stream";
+        FileName = fileName.Trim();
+        ContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType.Trim();
         FileSizeBytes = fileSizeBytes;
-        StoragePath = storagePath?.Trim() ?? string.Empty;
-        Sha256Hash = sha256Hash?.Trim().ToUpperInvariant() ?? string.Empty;
+        StoragePath = storagePath.Trim();
+        Sha256Hash = sha256Hash.Trim().ToUpperInvariant();
         UploadedByUserId = uploadedByUserId;
         ChangeSummary = changeSummary?.Trim() ?? string.Empty;
         UploadedAtUtc = DateTime.UtcNow;

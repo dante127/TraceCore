@@ -65,6 +65,15 @@ public class Investigation : BaseEntity, IAggregateRoot
         if (Status == InvestigationStatus.Active)
             return;
 
+        if (Status is not (InvestigationStatus.Planned or InvestigationStatus.Suspended))
+        {
+            throw new InvalidStateTransitionException("Investigation", Status.ToString(), InvestigationStatus.Active.ToString(),
+                $"Investigation can only be started from {InvestigationStatus.Planned} or {InvestigationStatus.Suspended}.");
+        }
+
+        if (leadInvestigatorId == Guid.Empty)
+            throw new DomainException("Lead investigator is required to start an investigation.");
+
         Status = InvestigationStatus.Active;
         LeadInvestigatorId = leadInvestigatorId;
         StartDateUtc ??= DateTime.UtcNow;
@@ -115,6 +124,12 @@ public class Investigation : BaseEntity, IAggregateRoot
         if (Status == InvestigationStatus.Completed)
             return;
 
+        if (Status != InvestigationStatus.Active)
+        {
+            throw new InvalidStateTransitionException("Investigation", Status.ToString(), InvestigationStatus.Completed.ToString(),
+                $"Only an {InvestigationStatus.Active} investigation can be completed.");
+        }
+
         Status = InvestigationStatus.Completed;
         EndDateUtc = DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(finalFindings))
@@ -131,15 +146,32 @@ public class Investigation : BaseEntity, IAggregateRoot
         if (Status == InvestigationStatus.Suspended)
             return;
 
+        if (Status != InvestigationStatus.Active)
+        {
+            throw new InvalidStateTransitionException("Investigation", Status.ToString(), InvestigationStatus.Suspended.ToString(),
+                $"Only an {InvestigationStatus.Active} investigation can be suspended.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("A suspension reason is required.");
+
         Status = InvestigationStatus.Suspended;
         UpdatedAtUtc = DateTime.UtcNow;
+
+        AddDomainEvent(new InvestigationSuspendedDomainEvent(Id, CaseId, reason.Trim()));
     }
 
     public void Close()
     {
+        if (Status == InvestigationStatus.Closed)
+            return;
+
         Status = InvestigationStatus.Closed;
+
         EndDateUtc ??= DateTime.UtcNow;
         UpdatedAtUtc = DateTime.UtcNow;
+
+        AddDomainEvent(new InvestigationClosedDomainEvent(Id, CaseId));
     }
 }
 
