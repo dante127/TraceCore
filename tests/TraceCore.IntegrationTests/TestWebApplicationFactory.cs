@@ -51,4 +51,19 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
+
+    public HttpClient CreateAuditorClient()
+    {
+        var client = CreateClient();
+        var jwtService = Services.GetRequiredService<IJwtTokenService>();
+        var token = jwtService.GenerateToken(
+            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            "auditor@tracecore.gov",
+            "Compliance Auditor",
+            ["Auditor"],
+            TraceCore.Api.Common.Permissions.AuditorPermissions);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return client;
+    }
 }

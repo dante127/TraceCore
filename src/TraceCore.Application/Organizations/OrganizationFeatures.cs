@@ -77,6 +77,16 @@ public sealed record UpdateOrganizationCommand(
     string? Address,
     string? Notes) : IRequest<Unit>;
 
+public class UpdateOrganizationCommandValidator : AbstractValidator<UpdateOrganizationCommand>
+{
+    public UpdateOrganizationCommandValidator()
+    {
+        RuleFor(v => v.Id).NotEmpty();
+        RuleFor(v => v.Name).NotEmpty().MaximumLength(200);
+        RuleFor(v => v.Email).EmailAddress().When(v => !string.IsNullOrEmpty(v.Email));
+    }
+}
+
 public class UpdateOrganizationCommandHandler : IRequestHandler<UpdateOrganizationCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -112,6 +122,17 @@ public sealed record LinkOrganizationToCaseCommand(
     Guid OrganizationId,
     string Role,
     string Notes) : IRequest<Unit>;
+
+public class LinkOrganizationToCaseCommandValidator : AbstractValidator<LinkOrganizationToCaseCommand>
+{
+    public LinkOrganizationToCaseCommandValidator()
+    {
+        RuleFor(v => v.CaseId).NotEmpty();
+        RuleFor(v => v.OrganizationId).NotEmpty();
+        RuleFor(v => v.Role).NotEmpty().MaximumLength(100);
+        RuleFor(v => v.Notes).MaximumLength(1000).When(v => v.Notes != null);
+    }
+}
 
 public class LinkOrganizationToCaseCommandHandler : IRequestHandler<LinkOrganizationToCaseCommand, Unit>
 {

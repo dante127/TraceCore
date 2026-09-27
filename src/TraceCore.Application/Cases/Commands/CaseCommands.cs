@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Application.Common.Exceptions;
 using TraceCore.Application.Common.Interfaces;
+using TraceCore.Application.Common.Models;
 using TraceCore.Domain.Common.Exceptions;
 using TraceCore.Domain.Entities.Cases;
 using TraceCore.Domain.Enums;
@@ -133,7 +134,7 @@ public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, Unit>
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!@case.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The case was modified by another user. Please reload.");
@@ -183,7 +184,7 @@ public class ChangeCaseStatusCommandHandler : IRequestHandler<ChangeCaseStatusCo
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!@case.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The case was modified by another user. Please reload.");
@@ -234,7 +235,7 @@ public class AssignCaseCommandHandler : IRequestHandler<AssignCaseCommand, Unit>
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!@case.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The case was modified by another user. Please reload.");
@@ -291,7 +292,7 @@ public class UpdateCasePriorityCommandHandler : IRequestHandler<UpdateCasePriori
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!@case.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The case was modified by another user. Please reload.");

@@ -80,6 +80,17 @@ public sealed record UpdatePersonCommand(
     DateTime? DateOfBirth,
     string? Notes) : IRequest<Unit>;
 
+public class UpdatePersonCommandValidator : AbstractValidator<UpdatePersonCommand>
+{
+    public UpdatePersonCommandValidator()
+    {
+        RuleFor(v => v.Id).NotEmpty();
+        RuleFor(v => v.FirstName).NotEmpty().MaximumLength(100);
+        RuleFor(v => v.LastName).NotEmpty().MaximumLength(100);
+        RuleFor(v => v.Email).EmailAddress().When(v => !string.IsNullOrEmpty(v.Email));
+    }
+}
+
 public class UpdatePersonCommandHandler : IRequestHandler<UpdatePersonCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -116,6 +127,17 @@ public sealed record LinkPersonToCaseCommand(
     ParticipantRole Role,
     string Notes) : IRequest<Unit>;
 
+public class LinkPersonToCaseCommandValidator : AbstractValidator<LinkPersonToCaseCommand>
+{
+    public LinkPersonToCaseCommandValidator()
+    {
+        RuleFor(v => v.CaseId).NotEmpty();
+        RuleFor(v => v.PersonId).NotEmpty();
+        RuleFor(v => v.Role).IsInEnum();
+        RuleFor(v => v.Notes).MaximumLength(1000).When(v => v.Notes != null);
+    }
+}
+
 public class LinkPersonToCaseCommandHandler : IRequestHandler<LinkPersonToCaseCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -150,6 +172,16 @@ public sealed record RemovePersonFromCaseCommand(
     Guid CaseId,
     Guid PersonId,
     ParticipantRole Role) : IRequest<Unit>;
+
+public class RemovePersonFromCaseCommandValidator : AbstractValidator<RemovePersonFromCaseCommand>
+{
+    public RemovePersonFromCaseCommandValidator()
+    {
+        RuleFor(v => v.CaseId).NotEmpty();
+        RuleFor(v => v.PersonId).NotEmpty();
+        RuleFor(v => v.Role).IsInEnum();
+    }
+}
 
 public class RemovePersonFromCaseCommandHandler : IRequestHandler<RemovePersonFromCaseCommand, Unit>
 {

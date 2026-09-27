@@ -1,3 +1,4 @@
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Application.Common.Exceptions;
@@ -67,6 +68,14 @@ public class GetUserNotificationsQueryHandler : IRequestHandler<GetUserNotificat
 
 // 2. Mark Notification As Read
 public sealed record MarkNotificationAsReadCommand(Guid NotificationId) : IRequest<Unit>;
+
+public class MarkNotificationAsReadCommandValidator : AbstractValidator<MarkNotificationAsReadCommand>
+{
+    public MarkNotificationAsReadCommandValidator()
+    {
+        RuleFor(v => v.NotificationId).NotEmpty();
+    }
+}
 
 public class MarkNotificationAsReadCommandHandler : IRequestHandler<MarkNotificationAsReadCommand, Unit>
 {
