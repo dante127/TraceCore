@@ -18,7 +18,7 @@ public static class DataSeeder
 {
     public static async Task SeedAsync(TraceCoreDbContext context, IConfiguration? configuration = null)
     {
-        await SeedUsersAsync(context, configuration);
+        await SeedUsersAsync(context, configuration, isDevelopment: true);
 
         if (await context.Cases.AnyAsync())
             return; // Already seeded
@@ -173,12 +173,40 @@ public static class DataSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedUsersAsync(TraceCoreDbContext context, IConfiguration? configuration)
+    public static async Task SeedUsersAsync(TraceCoreDbContext context, IConfiguration? configuration, bool isDevelopment)
     {
         if (await context.Users.AnyAsync())
             return;
 
-        // Dev/test seed only. Production must create users via managed identity workflow.
+        // One-time production bootstrap: Bootstrap:AdminPassword (or BOOTSTRAP_ADMIN_PASSWORD env).
+        var bootstrapPassword = configuration?["Bootstrap:AdminPassword"]
+            ?? Environment.GetEnvironmentVariable("BOOTSTRAP_ADMIN_PASSWORD");
+
+        if (!string.IsNullOrWhiteSpace(bootstrapPassword))
+        {
+            var adminEmail = configuration?["Bootstrap:AdminEmail"]
+                ?? Environment.GetEnvironmentVariable("BOOTSTRAP_ADMIN_EMAIL")
+                ?? "admin@tracecore.gov";
+
+            context.Users.Add(new AppUser(
+                Guid.NewGuid(),
+                adminEmail,
+                "Bootstrap Administrator",
+                BCrypt.Net.BCrypt.HashPassword(bootstrapPassword),
+                ["Administrator"]));
+            await context.SaveChangesAsync();
+            return;
+        }
+
+        if (!isDevelopment)
+        {
+            throw new InvalidOperationException(
+                "No users exist and Bootstrap:AdminPassword is not set. " +
+                "Set the Bootstrap__AdminPassword env var (and optionally Bootstrap__AdminEmail) for first startup, " +
+                "then remove it after signing in and rotating credentials.");
+        }
+
+        // Dev/test seed only.
         // Password comes from Seed:InitialPassword config or SEED_INITIAL_PASSWORD env.
         var initialPassword = configuration?["Seed:InitialPassword"]
             ?? Environment.GetEnvironmentVariable("SEED_INITIAL_PASSWORD")

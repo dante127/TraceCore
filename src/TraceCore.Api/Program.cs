@@ -211,6 +211,11 @@ try
     {
         await DataSeeder.SeedAsync(dbContext, builder.Configuration);
     }
+    else
+    {
+        // Production: never seed demo data; ensure at least one admin exists (bootstrap or fail fast).
+        await DataSeeder.SeedUsersAsync(dbContext, builder.Configuration, isDevelopment: false);
+    }
 }
 catch (Exception ex)
 {

@@ -501,11 +501,28 @@ Launch the entire stack (TraceCore Web API, Microsoft SQL Server 2022, and Redis
 docker compose up -d --build
 ```
 
+`ASPNETCORE_ENVIRONMENT` defaults to `Production` (set it to `Development` in your `.env` only for local work).
+`MSSQL_PID` defaults to `Developer` — production deployments must set a licensed edition (`Standard`, `Enterprise`, …).
+
 Once running:
 * **Swagger API Documentation**: [http://localhost:5000/swagger](http://localhost:5000/swagger) (Development only)
 * **Health Check**: [http://localhost:5000/health](http://localhost:5000/health)
 * **SQL Server**: `localhost:1433` (User: `sa`, Password: value of `MSSQL_SA_PASSWORD`)
 * **Redis**: `localhost:6379`
+
+#### First production boot
+
+1. Set `BOOTSTRAP_ADMIN_PASSWORD` (and optionally `BOOTSTRAP_ADMIN_EMAIL`) for the initial start only.
+   The API creates the administrator account, then refuses to re-seed once any user exists.
+2. Sign in, rotate the admin credentials, then **remove** `BOOTSTRAP_ADMIN_PASSWORD` from the environment.
+3. Starting Production without any users and without the bootstrap password fails fast by design.
+
+#### Production checklist
+
+* Terminate TLS at a reverse proxy / ingress in front of the API (the container serves plain HTTP).
+* Set `Cors:AllowedOrigins` to the exact frontend origin(s); empty means no cross-origin access.
+* Ship container logs and SQL backups to managed storage; alert on `/health` and 5xx rate.
+* Obtain a production license for the MediatR dependency (the startup log notes the requirement).
 
 To shut down and remove volumes:
 ```bash
