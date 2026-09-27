@@ -24,4 +24,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 COPY --from=build /app/publish .
+RUN mkdir -p /app/Logs /app/App_Data/Storage && chown -R app:app /app/Logs /app/App_Data
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+USER app
 ENTRYPOINT ["dotnet", "TraceCore.Api.dll"]

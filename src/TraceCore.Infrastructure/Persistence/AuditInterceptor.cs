@@ -10,6 +10,11 @@ namespace TraceCore.Infrastructure.Persistence;
 
 public class AuditInterceptor : SaveChangesInterceptor
 {
+    private static readonly HashSet<string> RedactedProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "PasswordHash", "SecretKey", "Secret", "Token", "ApiKey"
+    };
+
     private readonly ICurrentUserService _currentUser;
 
     public AuditInterceptor(ICurrentUserService currentUser)
@@ -56,6 +61,15 @@ public class AuditInterceptor : SaveChangesInterceptor
 
                 string propName = property.Metadata.Name;
 
+                // Never persist secret material to the audit trail.
+                if (RedactedProperties.Contains(propName))
+                {
+                    if (entry.State is EntityState.Added or EntityState.Modified)
+                        after[propName] = "[REDACTED]";
+                    if (entry.State is EntityState.Deleted or EntityState.Modified)
+                        before[propName] = "[REDACTED]";
+                    continue;
+                }
                 switch (entry.State)
                 {
                     case EntityState.Added:

@@ -46,15 +46,20 @@ public class OutboxProcessorWorker : BackgroundService
                     try
                     {
                         var eventType = Type.GetType(message.Type);
-                        if (eventType != null)
+                        if (eventType == null)
                         {
-                            var domainEvent = JsonSerializer.Deserialize(message.ContentJson, eventType);
-                            if (domainEvent != null && domainEvent is INotification notification)
-                            {
-                                await publisher.Publish(notification, stoppingToken);
-                            }
+                            message.MarkFailed($"Unknown event type '{message.Type}'.");
+                            continue;
                         }
 
+                        var domainEvent = JsonSerializer.Deserialize(message.ContentJson, eventType);
+                        if (domainEvent is not INotification notification)
+                        {
+                            message.MarkFailed($"Message content is not a dispatchable notification for type '{message.Type}'.");
+                            continue;
+                        }
+
+                        await publisher.Publish(notification, stoppingToken);
                         message.MarkProcessed();
                     }
                     catch (Exception ex)
@@ -117,23 +122,27 @@ public class SlaMonitoringWorker : BackgroundService
                     @case.MarkSlaBreached(now);
                     _logger.LogWarning("SLA breached for Case {CaseNumber} (Id: {CaseId}). Deadline was {Deadline}.",
                         @case.CaseNumber, @case.Id, @case.SlaDeadlineUtc);
-
-                    if (@case.AssignedInvestigatorId.HasValue)
-                    {
-                        await notificationService.SendAsync(
-                            @case.AssignedInvestigatorId.Value,
-                            $"SLA Breached: {@case.CaseNumber}",
-                            $"The SLA deadline for case '{@case.Title}' has expired.",
-                            NotificationType.SlaBreached,
-                            "Case",
-                            @case.Id,
-                            stoppingToken);
-                    }
                 }
 
                 if (breachedCases.Count > 0)
                 {
+                    // Persist breach state before notifying so alerts never precede committed state.
                     await context.SaveChangesAsync(stoppingToken);
+
+                    foreach (var @case in breachedCases)
+                    {
+                        if (@case.AssignedInvestigatorId.HasValue)
+                        {
+                            await notificationService.SendAsync(
+                                @case.AssignedInvestigatorId.Value,
+                                $"SLA Breached: {@case.CaseNumber}",
+                                $"The SLA deadline for case '{@case.Title}' has expired.",
+                                NotificationType.SlaBreached,
+                                "Case",
+                                @case.Id,
+                                stoppingToken);
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -180,22 +189,43 @@ public class TaskOverdueWorker : BackgroundService
                     .Take(50)
                     .ToListAsync(stoppingToken);
 
+                // Skip tasks already notified to avoid re-alerting every cycle.
+                var overdueIds = overdueTasks.Select(t => t.Id).ToList();
+                var alreadyNotified = await context.Notifications
+                    .AsNoTracking()
+                    .Where(n => n.Type == NotificationType.TaskOverdue &&
+                                n.ReferenceType == "Task" &&
+                                n.ReferenceId.HasValue &&
+                                overdueIds.Contains(n.ReferenceId.Value))
+                    .Select(n => n.ReferenceId!.Value)
+                    .Distinct()
+                    .ToListAsync(stoppingToken);
+                var notified = new HashSet<Guid>(alreadyNotified);
+
                 foreach (var task in overdueTasks)
                 {
                     task.MarkOverdue();
-                    await notificationService.SendAsync(
-                        task.AssignedToUserId!.Value,
-                        $"Task Overdue: {task.Title}",
-                        $"Task due date was {task.DueDateUtc:u}.",
-                        NotificationType.TaskOverdue,
-                        "Task",
-                        task.Id,
-                        stoppingToken);
                 }
 
                 if (overdueTasks.Count > 0)
                 {
+                    // Persist overdue state before notifying so alerts never precede committed state.
                     await context.SaveChangesAsync(stoppingToken);
+
+                    foreach (var task in overdueTasks)
+                    {
+                        if (!task.AssignedToUserId.HasValue || notified.Contains(task.Id))
+                            continue;
+
+                        await notificationService.SendAsync(
+                            task.AssignedToUserId.Value,
+                            $"Task Overdue: {task.Title}",
+                            $"Task due date was {task.DueDateUtc:u}.",
+                            NotificationType.TaskOverdue,
+                            "Task",
+                            task.Id,
+                            stoppingToken);
+                    }
                 }
             }
             catch (Exception ex)

@@ -55,49 +55,56 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         var requestName = typeof(TRequest).Name;
         var userId = _currentUserService.UserId?.ToString() ?? "Anonymous";
 
-        _logger.LogInformation("TraceCore Request: {Name} {@UserId} {@Request}",
-            requestName, userId, request);
+        // Payloads are intentionally not logged: requests carry PII case data.
+        _logger.LogInformation("TraceCore Request: {Name} {@UserId}", requestName, userId);
 
-        var response = await next();
+        try
+        {
+            var response = await next();
 
-        _logger.LogInformation("TraceCore Response: {Name} handled successfully.", requestName);
-        return response;
+            _logger.LogInformation("TraceCore Response: {Name} handled successfully.", requestName);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "TraceCore Request: {Name} failed for {@UserId}.", requestName, userId);
+            throw;
+        }
     }
 }
 
 public class PerformanceBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
-    private readonly Stopwatch _timer;
     private readonly ILogger<TRequest> _logger;
     private readonly ICurrentUserService _currentUserService;
 
     public PerformanceBehavior(ILogger<TRequest> logger, ICurrentUserService currentUserService)
     {
-        _timer = new Stopwatch();
         _logger = logger;
         _currentUserService = currentUserService;
     }
 
     public async Task<TResponse> Handle(TRequest request, RequestHandlerDelegate<TResponse> next, CancellationToken cancellationToken)
     {
-        _timer.Start();
+        var timer = Stopwatch.StartNew();
 
-        var response = await next();
-
-        _timer.Stop();
-
-        var elapsedMilliseconds = _timer.ElapsedMilliseconds;
-
-        if (elapsedMilliseconds > 500)
+        try
         {
-            var requestName = typeof(TRequest).Name;
-            var userId = _currentUserService.UserId?.ToString() ?? "Anonymous";
-
-            _logger.LogWarning("TraceCore Long Running Request: {Name} ({ElapsedMilliseconds} ms) {@UserId} {@Request}",
-                requestName, elapsedMilliseconds, userId, request);
+            return await next();
         }
+        finally
+        {
+            timer.Stop();
 
-        return response;
+            if (timer.ElapsedMilliseconds > 500)
+            {
+                var requestName = typeof(TRequest).Name;
+                var userId = _currentUserService.UserId?.ToString() ?? "Anonymous";
+
+                _logger.LogWarning("TraceCore Long Running Request: {Name} ({ElapsedMilliseconds} ms) {@UserId}",
+                    requestName, timer.ElapsedMilliseconds, userId);
+            }
+        }
     }
 }

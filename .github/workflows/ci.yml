@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOTNET_NOLOGO: true
+  Jwt__SecretKey: CI-TestSecretKey-Min32Bytes-0123456789!
+  Jwt__Issuer: TraceCore.Api
+  Jwt__Audience: TraceCore.Client
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore TraceCore.sln
+
+      - name: Build
+        run: dotnet build TraceCore.sln -c Release --no-restore --nologo -v minimal
+
+      - name: Test
+        run: dotnet test TraceCore.sln -c Release --no-build

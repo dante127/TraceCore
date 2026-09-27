@@ -6,7 +6,7 @@
 [![CQRS & MediatR](https://img.shields.io/badge/Pattern-CQRS%20with%20MediatR-orange.svg)](#cqrs--mediatr-pipeline)
 [![EF Core 10](https://img.shields.io/badge/ORM-EF%20Core%2010-purple.svg)](https://learn.microsoft.com/en-us/ef/core/)
 [![Docker Compose](https://img.shields.io/badge/Container-Docker%20Compose-2496ED?logo=docker&logoColor=white)](#docker-deployment)
-[![Tests](https://img.shields.io/badge/Tests-28%20Passed%20(100%25)-brightgreen.svg)](#automated-testing)
+[![Tests](https://img.shields.io/badge/Tests-48%20Passed%20(100%25)-brightgreen.svg)](#automated-testing)
 
 **TraceCore** is an enterprise-grade backend platform engineered for intelligence units, legal authorities, compliance teams, and forensic investigators. It provides end-to-end lifecycle governance for complex investigations, participant tracking, relationship mapping, SLA deadline tracking, automated deterministic risk assessments, and a tamper-evident, cryptographically chained evidence custody ledger.
 
@@ -488,6 +488,13 @@ The API is fully documented via interactive **Swagger UI** available at `/swagge
 
 ### Docker Compose Deployment (Recommended)
 
+Set the required secrets first (never commit real values):
+
+```bash
+export MSSQL_SA_PASSWORD='__strong-sa-password__'
+export JWT_SECRET_KEY='__unique-jwt-secret-min-32-chars__'
+```
+
 Launch the entire stack (TraceCore Web API, Microsoft SQL Server 2022, and Redis 7) with a single command:
 
 ```bash
@@ -495,9 +502,9 @@ docker compose up -d --build
 ```
 
 Once running:
-* **Swagger API Documentation**: [http://localhost:5000/swagger](http://localhost:5000/swagger)
+* **Swagger API Documentation**: [http://localhost:5000/swagger](http://localhost:5000/swagger) (Development only)
 * **Health Check**: [http://localhost:5000/health](http://localhost:5000/health)
-* **SQL Server**: `localhost:1433` (User: `sa`, Password: `TraceCoreSecureP@ssw0rd!2026`)
+* **SQL Server**: `localhost:1433` (User: `sa`, Password: value of `MSSQL_SA_PASSWORD`)
 * **Redis**: `localhost:6379`
 
 To shut down and remove volumes:
@@ -516,13 +523,9 @@ docker compose down -v
    ```
 
 2. **Configure Environment Variables**:
-   Copy `.env.example` to `.env` or verify connection strings in `src/TraceCore.Api/appsettings.Development.json`. By default, LocalDB is configured:
-   ```json
-   "ConnectionStrings": {
-     "DefaultConnection": "Server=(localdb)\\mssqllocaldb;Database=TraceCoreDb;Trusted_Connection=True;MultipleActiveResultSets=true",
-     "Redis": ""
-   }
-   ```
+   Copy `.env.example` to `.env` and set `MSSQL_SA_PASSWORD` and `JWT_SECRET_KEY` (min 32 chars).
+   The API fails fast at startup if `Jwt__SecretKey` is missing. For local SQL Server development,
+   `src/TraceCore.Api/appsettings.json` points at LocalDB by default.
 
 3. **Restore & Build**:
    ```bash
@@ -540,20 +543,22 @@ docker compose down -v
 
 ## Seed Accounts & Role Credentials
 
-When launched in `Development` mode, TraceCore automatically seeds test accounts:
+When launched in `Development` mode, TraceCore automatically seeds test accounts.
+Seed passwords come from `Seed:InitialPassword` config or the `SEED_INITIAL_PASSWORD` env var
+(dev default `Password123!` — override it in any shared environment):
 
-| Role | Email | Password | Pre-seeded Permissions |
-|---|---|---|---|
-| **Administrator** | `admin@tracecore.gov` | `Admin@TraceCore2026!` | All platform permissions (`*`) |
-| **Supervisor** | `supervisor@tracecore.gov` | `Supervisor@TraceCore2026!` | Case status, assignment, approvals, reports |
-| **Investigator** | `investigator@tracecore.gov` | `Investigator@TraceCore2026!` | Evidence, documents, activities, tasks |
-| **Analyst** | `analyst@tracecore.gov` | `Analyst@TraceCore2026!` | Read-only cases, evidence verification |
+| Role | Email | Pre-seeded Permissions |
+|---|---|---|
+| **Administrator** | `admin@tracecore.gov` | All platform permissions (`*`) |
+| **CaseManager** | `manager@tracecore.gov` | Case status, assignment, approvals, reports |
+| **Investigator** | `investigator@tracecore.gov` | Evidence, documents, activities, tasks |
+| **Auditor** | `auditor@tracecore.gov` | Read-only audit, evidence verification, reports |
 
 To acquire a token via `curl`:
 ```bash
 curl -X POST "http://localhost:5000/api/v1/auth/login" \
      -H "Content-Type: application/json" \
-     -d '{"email":"admin@tracecore.gov","password":"Admin@TraceCore2026!"}'
+     -d '{"email":"admin@tracecore.gov","password":"Password123!"}'
 ```
 
 ---
@@ -577,9 +582,9 @@ dotnet test tests/TraceCore.IntegrationTests/TraceCore.IntegrationTests.csproj
 
 ```
 Total Test Projects: 2
-- TraceCore.UnitTests:        24 Passed, 0 Failed (100% Success)
-- TraceCore.IntegrationTests:  4 Passed, 0 Failed (100% Success)
-Total Tests:                  28 Passed, 0 Failed (100% Success)
+- TraceCore.UnitTests:        39 Passed, 0 Failed (100% Success)
+- TraceCore.IntegrationTests:  9 Passed, 0 Failed (100% Success)
+Total Tests:                  48 Passed, 0 Failed (100% Success)
 ```
 
 **Key Scenarios Validated**:
@@ -590,8 +595,11 @@ Total Tests:                  28 Passed, 0 Failed (100% Success)
 - Deterministic risk assessment engine calculation and auto-escalation rules.
 - SLA target hours calculation and deadline breach detection.
 - Case task state transitions (`InProgress` → `Completed` / `Cancelled`).
+- Investigation lifecycle state machine (suspend/resume/close rules).
 - Optimistic concurrency control (`RowVersion`) conflict detection.
-- Role-based and permission-based endpoint authorization enforcement.
+- Malformed concurrency token rejection (`400 Bad Request`).
+- Role-based and permission-based endpoint authorization enforcement (`403` matrix).
+- Notification ownership enforcement (`404` for foreign notifications).
 
 ---
 

@@ -62,17 +62,4 @@ public class RedisCacheService : ICacheService
             _logger.LogWarning(ex, "Cache removal failed for key '{Key}'.", key);
         }
     }
-
-    public async Task RemoveByPrefixAsync(string prefix, CancellationToken cancellationToken = default)
-    {
-        // DistributedCache abstraction doesn't support pattern scans directly; remove direct key or invalidate tags
-        try
-        {
-            await _cache.RemoveAsync(prefix, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Cache prefix removal failed for '{Prefix}'.", prefix);
-        }
-    }
 }
