@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TraceCore.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using TraceCore.Infrastructure.Persistence;
 namespace TraceCore.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(TraceCoreDbContext))]
-    partial class TraceCoreDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260927121010_Phase2_ForeignKeys")]
+    partial class Phase2_ForeignKeys
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

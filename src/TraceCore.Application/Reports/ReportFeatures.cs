@@ -44,20 +44,17 @@ public class GetSlaComplianceReportQueryHandler : IRequestHandler<GetSlaComplian
 
     public async Task<SlaComplianceReportDto> Handle(GetSlaComplianceReportQuery request, CancellationToken cancellationToken)
     {
-        var cases = await _context.Cases
-            .AsNoTracking()
-            .Select(c => new { c.Priority, c.IsSlaBreached })
-            .ToListAsync(cancellationToken);
-
-        int total = cases.Count;
-        int breached = cases.Count(c => c.IsSlaBreached);
+        int total = await _context.Cases.CountAsync(cancellationToken);
+        int breached = await _context.Cases.CountAsync(c => c.IsSlaBreached, cancellationToken);
         int compliant = total - breached;
         double rate = total > 0 ? Math.Round((compliant / (double)total) * 100, 2) : 100.0;
 
-        var breachesByPriority = cases
+        var breachesByPriority = await _context.Cases
+            .AsNoTracking()
             .Where(c => c.IsSlaBreached)
-            .GroupBy(c => c.Priority.ToString())
-            .ToDictionary(g => g.Key, g => g.Count());
+            .GroupBy(c => c.Priority)
+            .Select(g => new { Key = g.Key.ToString(), Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
 
         return new SlaComplianceReportDto(total, compliant, breached, rate, breachesByPriority);
     }
@@ -77,19 +74,25 @@ public class GetRiskDistributionReportQueryHandler : IRequestHandler<GetRiskDist
 
     public async Task<RiskDistributionReportDto> Handle(GetRiskDistributionReportQuery request, CancellationToken cancellationToken)
     {
-        var cases = await _context.Cases
+        int total = await _context.Cases.CountAsync(cancellationToken);
+
+        var byLevel = await _context.Cases
             .AsNoTracking()
-            .Select(c => new { c.CurrentRiskScore, c.CurrentRiskLevel })
-            .ToListAsync(cancellationToken);
+            .GroupBy(c => c.CurrentRiskLevel)
+            .Select(g => new { Level = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Level, x => x.Count, cancellationToken);
 
-        int total = cases.Count;
-        int low = cases.Count(c => c.CurrentRiskLevel == RiskLevel.Low);
-        int med = cases.Count(c => c.CurrentRiskLevel == RiskLevel.Medium);
-        int high = cases.Count(c => c.CurrentRiskLevel == RiskLevel.High);
-        int crit = cases.Count(c => c.CurrentRiskLevel == RiskLevel.Critical);
-        double avg = total > 0 ? Math.Round(cases.Average(c => c.CurrentRiskScore), 1) : 0.0;
+        double avg = total > 0
+            ? Math.Round(await _context.Cases.AverageAsync(c => (double?)c.CurrentRiskScore, cancellationToken) ?? 0.0, 1)
+            : 0.0;
 
-        return new RiskDistributionReportDto(total, low, med, high, crit, avg);
+        return new RiskDistributionReportDto(
+            total,
+            byLevel.GetValueOrDefault(RiskLevel.Low),
+            byLevel.GetValueOrDefault(RiskLevel.Medium),
+            byLevel.GetValueOrDefault(RiskLevel.High),
+            byLevel.GetValueOrDefault(RiskLevel.Critical),
+            avg);
     }
 }
 
@@ -131,10 +134,13 @@ public class GetInvestigatorWorkloadReportQueryHandler : IRequestHandler<GetInve
             .Union(tasks.Select(t => t.InvestigatorId))
             .Distinct();
 
+        var caseCounts = activeCases.ToDictionary(c => c.InvestigatorId, c => c.CaseCount);
+        var taskLookup = tasks.ToDictionary(t => t.InvestigatorId);
+
         var list = allIds.Select(id =>
         {
-            int caseCount = activeCases.FirstOrDefault(c => c.InvestigatorId == id)?.CaseCount ?? 0;
-            var tInfo = tasks.FirstOrDefault(t => t.InvestigatorId == id);
+            caseCounts.TryGetValue(id, out int caseCount);
+            taskLookup.TryGetValue(id, out var tInfo);
             return new InvestigatorWorkloadItemDto(
                 id,
                 caseCount,

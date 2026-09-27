@@ -43,8 +43,11 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
 
     public async Task<SearchSummaryDto> Handle(SearchCasesAndEntitiesQuery request, CancellationToken cancellationToken)
     {
-        var results = new List<SearchResultItemDto>();
         var term = request.Query?.Trim().ToLower() ?? string.Empty;
+        int pageSize = request.PageSize;
+        var counts = new Dictionary<string, int>();
+        var results = new List<SearchResultItemDto>();
+        int totalMatches = 0;
 
         // 1. Cases Search
         if (!request.EntityType.HasValue || request.EntityType == Domain.Enums.EntityType.Case)
@@ -69,9 +72,13 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
             if (request.ToUtc.HasValue)
                 caseQuery = caseQuery.Where(c => c.CreatedAtUtc <= request.ToUtc.Value);
 
+            int caseTotal = await caseQuery.CountAsync(cancellationToken);
+            counts[nameof(Domain.Enums.EntityType.Case)] = caseTotal;
+            totalMatches += caseTotal;
+
             var cases = await caseQuery
                 .OrderByDescending(c => c.CreatedAtUtc)
-                .Take(50)
+                .Take(pageSize)
                 .Select(c => new SearchResultItemDto(
                     c.Id,
                     Domain.Enums.EntityType.Case,
@@ -94,12 +101,16 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
             {
                 peopleQuery = peopleQuery.Where(p => p.DisplayName.ToLower().Contains(term) ||
                                                      (p.Email != null && p.Email.ToLower().Contains(term)) ||
-                                                     p.Notes.ToLower().Contains(term));
+                                                     (p.Notes != null && p.Notes.ToLower().Contains(term)));
             }
+
+            int peopleTotal = await peopleQuery.CountAsync(cancellationToken);
+            counts[nameof(Domain.Enums.EntityType.Person)] = peopleTotal;
+            totalMatches += peopleTotal;
 
             var people = await peopleQuery
                 .OrderBy(p => p.LastName)
-                .Take(25)
+                .Take(pageSize)
                 .Select(p => new SearchResultItemDto(
                     p.Id,
                     Domain.Enums.EntityType.Person,
@@ -124,9 +135,13 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
                                                (o.Industry != null && o.Industry.ToLower().Contains(term)));
             }
 
+            int orgTotal = await orgQuery.CountAsync(cancellationToken);
+            counts[nameof(Domain.Enums.EntityType.Organization)] = orgTotal;
+            totalMatches += orgTotal;
+
             var orgs = await orgQuery
                 .OrderBy(o => o.Name)
-                .Take(25)
+                .Take(pageSize)
                 .Select(o => new SearchResultItemDto(
                     o.Id,
                     Domain.Enums.EntityType.Organization,
@@ -153,9 +168,13 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
                                              e.Hash.ToLower().Contains(term));
             }
 
+            int evTotal = await evQuery.CountAsync(cancellationToken);
+            counts[nameof(Domain.Enums.EntityType.Evidence)] = evTotal;
+            totalMatches += evTotal;
+
             var evidence = await evQuery
                 .OrderByDescending(e => e.CreatedAtUtc)
-                .Take(25)
+                .Take(pageSize)
                 .Select(e => new SearchResultItemDto(
                     e.Id,
                     Domain.Enums.EntityType.Evidence,
@@ -170,15 +189,12 @@ public class SearchCasesAndEntitiesQueryHandler : IRequestHandler<SearchCasesAnd
             results.AddRange(evidence);
         }
 
-        var counts = results
-            .GroupBy(r => r.EntityType.ToString())
-            .ToDictionary(g => g.Key, g => g.Count());
-
         var paginated = results
-            .Skip((request.PageNumber - 1) * request.PageSize)
-            .Take(request.PageSize)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Skip((request.PageNumber - 1) * pageSize)
+            .Take(pageSize)
             .ToList();
 
-        return new SearchSummaryDto(paginated, results.Count, counts);
+        return new SearchSummaryDto(paginated, totalMatches, counts);
     }
 }

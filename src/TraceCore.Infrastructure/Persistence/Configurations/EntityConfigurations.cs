@@ -61,6 +61,11 @@ public class CasePersonConfiguration : IEntityTypeConfiguration<CasePerson>
 
         builder.Property(cp => cp.Notes).HasMaxLength(1000);
         builder.HasIndex(cp => new { cp.CaseId, cp.PersonId, cp.Role }).IsUnique();
+
+        builder.HasOne<Person>()
+            .WithMany()
+            .HasForeignKey(cp => cp.PersonId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -74,6 +79,11 @@ public class CaseOrganizationConfiguration : IEntityTypeConfiguration<CaseOrgani
         builder.Property(co => co.Role).HasMaxLength(100).IsRequired();
         builder.Property(co => co.Notes).HasMaxLength(1000);
         builder.HasIndex(co => new { co.CaseId, co.OrganizationId, co.Role }).IsUnique();
+
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(co => co.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 
@@ -105,6 +115,11 @@ public class EvidenceConfiguration : IEntityTypeConfiguration<Evidence>
         builder.HasIndex(e => new { e.CaseId, e.EvidenceNumber }).IsUnique();
         builder.HasIndex(e => e.Hash);
         builder.HasIndex(e => e.Status);
+
+        builder.HasOne<Case>()
+            .WithMany()
+            .HasForeignKey(e => e.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(e => e.CustodyEvents)
             .WithOne()
@@ -142,6 +157,11 @@ public class InvestigationConfiguration : IEntityTypeConfiguration<Investigation
         builder.HasIndex(i => new { i.CaseId, i.Status });
         builder.HasIndex(i => i.LeadInvestigatorId);
 
+        builder.HasOne<Case>()
+            .WithMany()
+            .HasForeignKey(i => i.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(i => i.Activities)
             .WithOne()
             .HasForeignKey(a => a.InvestigationId)
@@ -175,6 +195,11 @@ public class CaseTaskConfiguration : IEntityTypeConfiguration<CaseTask>
 
         builder.HasIndex(t => new { t.CaseId, t.Status });
         builder.HasIndex(t => new { t.AssignedToUserId, t.DueDateUtc });
+
+        builder.HasOne<Case>()
+            .WithMany()
+            .HasForeignKey(t => t.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -243,6 +268,11 @@ public class DocumentConfiguration : IEntityTypeConfiguration<Document>
 
         builder.HasIndex(d => d.CaseId);
 
+        builder.HasOne<Case>()
+            .WithMany()
+            .HasForeignKey(d => d.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(d => d.Versions)
             .WithOne()
             .HasForeignKey(v => v.DocumentId)
@@ -276,6 +306,11 @@ public class RiskAssessmentHistoryConfiguration : IEntityTypeConfiguration<RiskA
 
         builder.Property(r => r.TriggerReason).HasMaxLength(255);
         builder.HasIndex(r => new { r.CaseId, r.EvaluatedAtUtc });
+
+        builder.HasOne<Case>()
+            .WithMany()
+            .HasForeignKey(r => r.CaseId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

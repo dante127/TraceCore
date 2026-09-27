@@ -180,6 +180,7 @@ public class GetEntityGraphQueryHandler : IRequestHandler<GetEntityGraphQuery, G
         var visitedEntityIds = new HashSet<Guid> { request.EntityId };
         var frontier = new HashSet<Guid> { request.EntityId };
         var edges = new List<GraphEdgeDto>();
+        var seenEdgeIds = new HashSet<Guid>();
 
         for (int d = 0; d < maxDepth && frontier.Count > 0; d++)
         {
@@ -187,13 +188,15 @@ public class GetEntityGraphQueryHandler : IRequestHandler<GetEntityGraphQuery, G
             var levelRels = await _context.EntityRelationships
                 .AsNoTracking()
                 .Where(r => r.IsActive && (currentLevel.Contains(r.SourceEntityId) || currentLevel.Contains(r.TargetEntityId)))
+                .OrderByDescending(r => r.CreatedAtUtc)
+                .Take(500)
                 .ToListAsync(cancellationToken);
 
             frontier.Clear();
 
             foreach (var r in levelRels)
             {
-                if (edges.All(e => e.Id != r.Id))
+                if (seenEdgeIds.Add(r.Id))
                 {
                     edges.Add(new GraphEdgeDto(
                         r.Id,
@@ -281,6 +284,33 @@ public class FindRelationshipPathQueryHandler : IRequestHandler<FindRelationship
 
         int maxDepth = Math.Clamp(request.MaxDepth, 1, 5);
 
+        // Single bounded edge load: BFS runs in memory (one roundtrip instead of one per node).
+        var activeEdges = await _context.EntityRelationships
+            .AsNoTracking()
+            .Where(r => r.IsActive)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Take(5000)
+            .Select(r => new { r.SourceEntityId, r.TargetEntityId })
+            .ToListAsync(cancellationToken);
+
+        var adjacency = new Dictionary<Guid, List<Guid>>();
+        foreach (var e in activeEdges)
+        {
+            if (!adjacency.TryGetValue(e.SourceEntityId, out var fromList))
+            {
+                fromList = [];
+                adjacency[e.SourceEntityId] = fromList;
+            }
+            fromList.Add(e.TargetEntityId);
+
+            if (!adjacency.TryGetValue(e.TargetEntityId, out var toList))
+            {
+                toList = [];
+                adjacency[e.TargetEntityId] = toList;
+            }
+            toList.Add(e.SourceEntityId);
+        }
+
         // BFS path finding
         var queue = new Queue<List<Guid>>();
         queue.Enqueue([request.SourceId]);
@@ -295,11 +325,8 @@ public class FindRelationshipPathQueryHandler : IRequestHandler<FindRelationship
 
             var current = path.Last();
 
-            var neighbors = await _context.EntityRelationships
-                .AsNoTracking()
-                .Where(r => r.IsActive && (r.SourceEntityId == current || r.TargetEntityId == current))
-                .Select(r => r.SourceEntityId == current ? r.TargetEntityId : r.SourceEntityId)
-                .ToListAsync(cancellationToken);
+            if (!adjacency.TryGetValue(current, out var neighbors))
+                continue;
 
             foreach (var neighbor in neighbors)
             {

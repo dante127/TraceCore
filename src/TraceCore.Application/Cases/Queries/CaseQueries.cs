@@ -33,22 +33,28 @@ public class GetCaseByIdQueryHandler : IRequestHandler<GetCaseByIdQuery, CaseDet
         // Fetch participant names
         var personIds = @case.Persons.Select(p => p.PersonId).ToList();
         var people = await _context.People
+            .AsNoTracking()
             .Where(p => personIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => new { p.DisplayName, Email = p.Email ?? string.Empty }, cancellationToken);
 
         var orgIds = @case.Organizations.Select(o => o.OrganizationId).ToList();
         var orgs = await _context.Organizations
+            .AsNoTracking()
             .Where(o => orgIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => o.Name, cancellationToken);
 
-        var participantDtos = @case.Persons.Select(p => new CaseParticipantDto(
-            p.Id,
-            p.PersonId,
-            people.TryGetValue(p.PersonId, out var val) ? val.DisplayName : "Unknown",
-            people.TryGetValue(p.PersonId, out var v2) ? v2.Email : "",
-            p.Role,
-            p.Notes,
-            p.AssignedAtUtc)).ToList();
+        var participantDtos = @case.Persons.Select(p =>
+        {
+            people.TryGetValue(p.PersonId, out var val);
+            return new CaseParticipantDto(
+                p.Id,
+                p.PersonId,
+                val?.DisplayName ?? "Unknown",
+                val?.Email ?? "",
+                p.Role,
+                p.Notes,
+                p.AssignedAtUtc);
+        }).ToList();
 
         var orgDtos = @case.Organizations.Select(o => new CaseOrganizationDto(
             o.Id,
@@ -221,10 +227,12 @@ public class GetCaseTimelineQueryHandler : IRequestHandler<GetCaseTimelineQuery,
                 audit.CorrelationId));
         }
 
-        // 2. Custody events for Evidence under this Case
+        // 2. Custody events for Evidence under this Case (ID list bounded to avoid SQL parameter limits)
         var evidenceIds = await _context.Evidence
+            .AsNoTracking()
             .Where(e => e.CaseId == request.CaseId)
             .Select(e => e.Id)
+            .Take(500)
             .ToListAsync(cancellationToken);
 
         var custodyEvents = await _context.EvidenceCustodyEvents
@@ -246,10 +254,12 @@ public class GetCaseTimelineQueryHandler : IRequestHandler<GetCaseTimelineQuery,
                 ce.CurrentHash));
         }
 
-        // 3. Investigation Activities
+        // 3. Investigation Activities (ID list bounded to avoid SQL parameter limits)
         var investigationIds = await _context.Investigations
+            .AsNoTracking()
             .Where(i => i.CaseId == request.CaseId)
             .Select(i => i.Id)
+            .Take(500)
             .ToListAsync(cancellationToken);
 
         var activities = await _context.InvestigationActivities
@@ -289,11 +299,19 @@ public class GetCaseDashboardMetricsQueryHandler : IRequestHandler<GetCaseDashbo
 
     public async Task<CaseDashboardMetricsDto> Handle(GetCaseDashboardMetricsQuery request, CancellationToken cancellationToken)
     {
-        var totalCases = await _context.Cases.CountAsync(cancellationToken);
-        var activeCases = await _context.Cases.CountAsync(c => c.Status == CaseStatus.Open || c.Status == CaseStatus.UnderInvestigation, cancellationToken);
-        var pendingReview = await _context.Cases.CountAsync(c => c.Status == CaseStatus.PendingReview, cancellationToken);
-        var criticalPriority = await _context.Cases.CountAsync(c => c.Priority == CasePriority.Critical, cancellationToken);
-        var slaBreached = await _context.Cases.CountAsync(c => c.IsSlaBreached, cancellationToken);
+        var caseMetrics = await _context.Cases
+            .AsNoTracking()
+            .GroupBy(c => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Active = g.Count(c => c.Status == CaseStatus.Open || c.Status == CaseStatus.UnderInvestigation),
+                PendingReview = g.Count(c => c.Status == CaseStatus.PendingReview),
+                CriticalPriority = g.Count(c => c.Priority == CasePriority.Critical),
+                SlaBreached = g.Count(c => c.IsSlaBreached)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
         var overdueTasks = await _context.Tasks.CountAsync(t => t.DueDateUtc < DateTime.UtcNow && t.Status != TaskStatus.Completed && t.Status != TaskStatus.Cancelled, cancellationToken);
         var totalEvidence = await _context.Evidence.CountAsync(cancellationToken);
 
@@ -313,11 +331,11 @@ public class GetCaseDashboardMetricsQueryHandler : IRequestHandler<GetCaseDashbo
             .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
 
         return new CaseDashboardMetricsDto(
-            totalCases,
-            activeCases,
-            pendingReview,
-            criticalPriority,
-            slaBreached,
+            caseMetrics?.Total ?? 0,
+            caseMetrics?.Active ?? 0,
+            caseMetrics?.PendingReview ?? 0,
+            caseMetrics?.CriticalPriority ?? 0,
+            caseMetrics?.SlaBreached ?? 0,
             overdueTasks,
             totalEvidence,
             byType,
