@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Application.Common.Exceptions;
 using TraceCore.Application.Common.Interfaces;
+using TraceCore.Application.Common.Models;
 using TraceCore.Domain.Entities.Tasks;
 using TraceCore.Domain.Enums;
 using TaskStatus = TraceCore.Domain.Enums.TaskStatus;
@@ -105,7 +106,7 @@ public class UpdateTaskStatusCommandHandler : IRequestHandler<UpdateTaskStatusCo
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!task.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The task was modified concurrently. Please reload.");
@@ -126,6 +127,15 @@ public sealed record AssignTaskCommand(
     Guid AssignedToUserId,
     string? RowVersion = null) : IRequest<Unit>;
 
+public class AssignTaskCommandValidator : AbstractValidator<AssignTaskCommand>
+{
+    public AssignTaskCommandValidator()
+    {
+        RuleFor(v => v.TaskId).NotEmpty();
+        RuleFor(v => v.AssignedToUserId).NotEmpty();
+    }
+}
+
 public class AssignTaskCommandHandler : IRequestHandler<AssignTaskCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -143,7 +153,7 @@ public class AssignTaskCommandHandler : IRequestHandler<AssignTaskCommand, Unit>
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!task.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The task was modified concurrently. Please reload.");
@@ -176,6 +186,7 @@ public class GetTasksByCaseIdQueryHandler : IRequestHandler<GetTasksByCaseIdQuer
             .Where(t => t.CaseId == request.CaseId)
             .OrderByDescending(t => t.Priority)
             .ThenBy(t => t.DueDateUtc)
+            .Take(200)
             .Select(t => new TaskDto(
                 t.Id,
                 t.CaseId,
@@ -216,6 +227,7 @@ public class GetOverdueTasksQueryHandler : IRequestHandler<GetOverdueTasksQuery,
                         t.Status != TaskStatus.Completed &&
                         t.Status != TaskStatus.Cancelled)
             .OrderBy(t => t.DueDateUtc)
+            .Take(200)
             .Select(t => new TaskDto(
                 t.Id,
                 t.CaseId,
@@ -259,6 +271,7 @@ public class GetMyTasksQueryHandler : IRequestHandler<GetMyTasksQuery, IReadOnly
             .AsNoTracking()
             .Where(t => t.AssignedToUserId == userId.Value && t.Status != TaskStatus.Completed && t.Status != TaskStatus.Cancelled)
             .OrderBy(t => t.DueDateUtc)
+            .Take(200)
             .Select(t => new TaskDto(
                 t.Id,
                 t.CaseId,

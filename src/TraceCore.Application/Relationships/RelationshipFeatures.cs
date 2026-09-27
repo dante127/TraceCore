@@ -104,6 +104,14 @@ public class CreateEntityRelationshipCommandHandler : IRequestHandler<CreateEnti
 // 2. Deactivate Relationship
 public sealed record DeactivateEntityRelationshipCommand(Guid Id) : IRequest<Unit>;
 
+public class DeactivateEntityRelationshipCommandValidator : AbstractValidator<DeactivateEntityRelationshipCommand>
+{
+    public DeactivateEntityRelationshipCommandValidator()
+    {
+        RuleFor(v => v.Id).NotEmpty();
+    }
+}
+
 public class DeactivateEntityRelationshipCommandHandler : IRequestHandler<DeactivateEntityRelationshipCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -145,6 +153,8 @@ public class GetDirectRelationshipsQueryHandler : IRequestHandler<GetDirectRelat
             .Where(r => r.IsActive &&
                        ((r.SourceEntityId == request.EntityId && r.SourceEntityType == request.EntityType) ||
                         (r.TargetEntityId == request.EntityId && r.TargetEntityType == request.EntityType)))
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Take(200)
             .Select(r => new RelationshipDto(
                 r.Id,
                 r.SourceEntityId,

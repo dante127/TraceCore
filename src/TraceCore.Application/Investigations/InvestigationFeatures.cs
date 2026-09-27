@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Application.Common.Exceptions;
 using TraceCore.Application.Common.Interfaces;
+using TraceCore.Application.Common.Models;
 using TraceCore.Domain.Entities.Investigations;
 using TraceCore.Domain.Enums;
 
@@ -150,6 +151,14 @@ public sealed record UpdateInvestigationFindingsCommand(
     string Findings,
     string? RowVersion = null) : IRequest<Unit>;
 
+public class UpdateInvestigationFindingsCommandValidator : AbstractValidator<UpdateInvestigationFindingsCommand>
+{
+    public UpdateInvestigationFindingsCommandValidator()
+    {
+        RuleFor(v => v.InvestigationId).NotEmpty();
+    }
+}
+
 public class UpdateInvestigationFindingsCommandHandler : IRequestHandler<UpdateInvestigationFindingsCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -167,7 +176,7 @@ public class UpdateInvestigationFindingsCommandHandler : IRequestHandler<UpdateI
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!investigation.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The investigation was modified concurrently. Please reload.");
@@ -188,6 +197,16 @@ public sealed record UpdateInvestigationStatusCommand(
     string? Reason = null,
     string? RowVersion = null) : IRequest<Unit>;
 
+public class UpdateInvestigationStatusCommandValidator : AbstractValidator<UpdateInvestigationStatusCommand>
+{
+    public UpdateInvestigationStatusCommandValidator()
+    {
+        RuleFor(v => v.InvestigationId).NotEmpty();
+        RuleFor(v => v.NewStatus).IsInEnum();
+        RuleFor(v => v.Reason).MaximumLength(500).When(v => v.Reason != null);
+    }
+}
+
 public class UpdateInvestigationStatusCommandHandler : IRequestHandler<UpdateInvestigationStatusCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
@@ -205,7 +224,7 @@ public class UpdateInvestigationStatusCommandHandler : IRequestHandler<UpdateInv
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!investigation.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The investigation was modified concurrently. Please reload.");
@@ -306,6 +325,7 @@ public class GetInvestigationsByCaseIdQueryHandler : IRequestHandler<GetInvestig
             .AsNoTracking()
             .Where(i => i.CaseId == request.CaseId)
             .OrderByDescending(i => i.CreatedAtUtc)
+            .Take(200)
             .Select(i => new InvestigationDto(
                 i.Id,
                 i.CaseId,

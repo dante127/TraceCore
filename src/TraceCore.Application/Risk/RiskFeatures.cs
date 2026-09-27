@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Application.Common.Exceptions;
@@ -129,6 +130,15 @@ public class RiskAssessmentService : IRiskAssessmentService
 // 2. Assess Case Risk Command
 public sealed record AssessCaseRiskCommand(Guid CaseId, string TriggerReason = "Manual Request") : IRequest<RiskAssessmentResult>;
 
+public class AssessCaseRiskCommandValidator : AbstractValidator<AssessCaseRiskCommand>
+{
+    public AssessCaseRiskCommandValidator()
+    {
+        RuleFor(v => v.CaseId).NotEmpty();
+        RuleFor(v => v.TriggerReason).MaximumLength(500).When(v => v.TriggerReason != null);
+    }
+}
+
 public class AssessCaseRiskCommandHandler : IRequestHandler<AssessCaseRiskCommand, RiskAssessmentResult>
 {
     private readonly IRiskAssessmentService _riskService;
@@ -162,6 +172,7 @@ public class GetCaseRiskHistoryQueryHandler : IRequestHandler<GetCaseRiskHistory
             .AsNoTracking()
             .Where(r => r.CaseId == request.CaseId)
             .OrderByDescending(r => r.EvaluatedAtUtc)
+            .Take(200)
             .ToListAsync(cancellationToken);
 
         return logs.Select(l => new RiskHistoryDto(

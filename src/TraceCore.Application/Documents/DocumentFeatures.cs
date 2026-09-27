@@ -182,6 +182,7 @@ public class GetDocumentsByCaseIdQueryHandler : IRequestHandler<GetDocumentsByCa
             .AsNoTracking()
             .Where(d => d.CaseId == request.CaseId)
             .OrderByDescending(d => d.CreatedAtUtc)
+            .Take(200)
             .ToListAsync(cancellationToken);
 
         return docs.Select(d =>

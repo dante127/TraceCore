@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Application.Common.Exceptions;
 using TraceCore.Application.Common.Interfaces;
+using TraceCore.Application.Common.Models;
 using TraceCore.Domain.Entities.Evidence;
 using TraceCore.Domain.Enums;
 using EvidenceEntity = TraceCore.Domain.Entities.Evidence.Evidence;
@@ -177,7 +178,7 @@ public class TransferEvidenceCustodyCommandHandler : IRequestHandler<TransferEvi
 
         if (!string.IsNullOrEmpty(request.RowVersion))
         {
-            var requestVersion = Convert.FromBase64String(request.RowVersion);
+            var requestVersion = ConcurrencyToken.DecodeOrNull(request.RowVersion)!;
             if (!evidence.RowVersion.SequenceEqual(requestVersion))
             {
                 throw new ConcurrencyException("The evidence record was modified concurrently. Please reload.");
@@ -274,6 +275,7 @@ public class GetEvidenceByCaseIdQueryHandler : IRequestHandler<GetEvidenceByCase
             .AsNoTracking()
             .Where(e => e.CaseId == request.CaseId)
             .OrderByDescending(e => e.CreatedAtUtc)
+            .Take(200)
             .Select(e => new EvidenceDto(
                 e.Id,
                 e.CaseId,

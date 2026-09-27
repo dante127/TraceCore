@@ -165,7 +165,7 @@ public class ApiWorkflowTests : IClassFixture<TestWebApplicationFactory>
             DateTime.UtcNow.AddDays(5));
 
         var taskRes = await _adminClient.PostAsJsonAsync("/api/v1/tasks", taskCmd);
-        taskRes.StatusCode.Should().Be(HttpStatusCode.OK);
+        taskRes.StatusCode.Should().Be(HttpStatusCode.Created);
 
         // 9. Assess Case Risk (Deterministic Rule Engine)
         var assessRes = await _adminClient.PostAsync($"/api/v1/risk/cases/{caseId}/assess?triggerReason=AutomatedWorkflow", null);

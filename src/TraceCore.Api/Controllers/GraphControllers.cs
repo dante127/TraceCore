@@ -21,7 +21,7 @@ public class RelationshipsController : ApiControllerBase
     public async Task<ActionResult<Guid>> CreateRelationship([FromBody] CreateEntityRelationshipCommand command, CancellationToken ct)
     {
         var id = await Sender.Send(command, ct);
-        return Ok(id);
+        return StatusCode(StatusCodes.Status201Created, id);
     }
 
     [HttpDelete("{id:guid}")]

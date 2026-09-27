@@ -75,7 +75,7 @@ public class DocumentsController : ApiControllerBase
             hash);
 
         var docId = await Sender.Send(command, ct);
-        return Ok(docId);
+        return StatusCode(StatusCodes.Status201Created, docId);
     }
 
     [HttpPost("{id:guid}/versions")]
@@ -115,7 +115,7 @@ public class DocumentsController : ApiControllerBase
             changeSummary);
 
         var version = await Sender.Send(command, ct);
-        return Ok(version);
+        return StatusCode(StatusCodes.Status201Created, version);
     }
 
     [HttpGet("{id:guid}/versions/{versionNumber:int}/download")]

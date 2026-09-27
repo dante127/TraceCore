@@ -90,7 +90,7 @@ public class InvestigationsController : ApiControllerBase
         }
 
         var activityId = await Sender.Send(command, ct);
-        return Ok(activityId);
+        return StatusCode(StatusCodes.Status201Created, activityId);
     }
 
     [HttpPut("{id:guid}/findings")]

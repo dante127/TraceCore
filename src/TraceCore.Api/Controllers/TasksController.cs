@@ -46,7 +46,7 @@ public class TasksController : ApiControllerBase
         }
 
         var id = await Sender.Send(command, ct);
-        return Ok(id);
+        return StatusCode(StatusCodes.Status201Created, id);
     }
 
     [HttpPut("{id:guid}/status")]
