@@ -186,13 +186,15 @@ public class TransferEvidenceCustodyCommandHandler : IRequestHandler<TransferEvi
 
         var fromUserId = _currentUser.UserId ?? Guid.Parse("11111111-1111-1111-1111-111111111111");
 
-        evidence.RecordTransfer(
+        var custodyEvent = evidence.RecordTransfer(
             fromUserId,
             request.ToUserId,
             request.Action,
             request.NewLocation,
             request.Notes,
             request.VerifiedHash);
+
+        _context.Add(custodyEvent);
 
         await _context.SaveChangesAsync(cancellationToken);
         return Unit.Value;

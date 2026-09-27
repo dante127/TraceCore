@@ -10,6 +10,7 @@ using TraceCore.Domain.Entities.People;
 using TraceCore.Domain.Entities.Relationships;
 using TraceCore.Domain.Entities.Risk;
 using TraceCore.Domain.Entities.Tasks;
+using TraceCore.Domain.Entities.Users;
 
 using EvidenceEntity = TraceCore.Domain.Entities.Evidence.Evidence;
 
@@ -35,6 +36,7 @@ public interface IApplicationDbContext
     IQueryable<AuditLog> AuditLogs { get; }
     IQueryable<Notification> Notifications { get; }
     IQueryable<OutboxMessage> OutboxMessages { get; }
+    IQueryable<AppUser> Users { get; }
 
     void Add<TEntity>(TEntity entity) where TEntity : class;
     void Update<TEntity>(TEntity entity) where TEntity : class;

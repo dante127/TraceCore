@@ -80,6 +80,17 @@ public class DocumentsController : ApiControllerBase
         [FromForm] string changeSummary,
         CancellationToken ct)
     {
+        var caseId = await _context.Documents
+            .AsNoTracking()
+            .Where(d => d.Id == id)
+            .Select(d => (Guid?)d.CaseId)
+            .FirstOrDefaultAsync(ct);
+        if (caseId is null)
+            return NotFound();
+
+        if (!await _caseAuth.HasCaseAccessAsync(caseId.Value, CaseAccessLevel.ReadWrite, ct))
+            return Forbid();
+
         if (file == null || file.Length == 0)
             return BadRequest("File cannot be empty.");
 
@@ -109,6 +120,17 @@ public class DocumentsController : ApiControllerBase
 
         if (version == null)
             return NotFound("Requested document version was not found.");
+
+        var caseId = await _context.Documents
+            .AsNoTracking()
+            .Where(d => d.Id == id)
+            .Select(d => (Guid?)d.CaseId)
+            .FirstOrDefaultAsync(ct);
+        if (caseId is null)
+            return NotFound("Requested document version was not found.");
+
+        if (!await _caseAuth.HasCaseAccessAsync(caseId.Value, CaseAccessLevel.Read, ct))
+            return Forbid();
 
         var stream = await _storage.GetFileStreamAsync(version.StoragePath, ct);
         return File(stream, version.ContentType, version.FileName);

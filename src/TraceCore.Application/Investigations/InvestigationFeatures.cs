@@ -137,6 +137,8 @@ public class AddInvestigationActivityCommandHandler : IRequestHandler<AddInvesti
             request.Location,
             request.Notes);
 
+        _context.Add(activity);
+
         await _context.SaveChangesAsync(cancellationToken);
         return activity.Id;
     }

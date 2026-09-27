@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using TraceCore.Application.Common.Interfaces;
 using TraceCore.Application.Evidence;
 using TraceCore.Domain.Enums;
 using TraceCore.Infrastructure.Security;
@@ -10,10 +12,12 @@ namespace TraceCore.Api.Controllers;
 public class EvidenceController : ApiControllerBase
 {
     private readonly ICaseAuthorizationService _caseAuth;
+    private readonly IApplicationDbContext _context;
 
-    public EvidenceController(ICaseAuthorizationService caseAuth)
+    public EvidenceController(ICaseAuthorizationService caseAuth, IApplicationDbContext context)
     {
         _caseAuth = caseAuth;
+        _context = context;
     }
 
     [HttpGet]
@@ -57,6 +61,17 @@ public class EvidenceController : ApiControllerBase
         if (id != command.EvidenceId)
             return BadRequest("Route ID does not match command ID.");
 
+        var caseId = await _context.Evidence
+            .AsNoTracking()
+            .Where(e => e.Id == id)
+            .Select(e => (Guid?)e.CaseId)
+            .FirstOrDefaultAsync(ct);
+        if (caseId is null)
+            return NotFound();
+
+        if (!await _caseAuth.HasCaseAccessAsync(caseId.Value, CaseAccessLevel.ReadWrite, ct))
+            return Forbid();
+
         await Sender.Send(command, ct);
         return NoContent();
     }
@@ -64,6 +79,17 @@ public class EvidenceController : ApiControllerBase
     [HttpGet("{id:guid}/verify")]
     public async Task<ActionResult<EvidenceVerificationDto>> VerifyChain(Guid id, CancellationToken ct)
     {
+        var caseId = await _context.Evidence
+            .AsNoTracking()
+            .Where(e => e.Id == id)
+            .Select(e => (Guid?)e.CaseId)
+            .FirstOrDefaultAsync(ct);
+        if (caseId is null)
+            return NotFound();
+
+        if (!await _caseAuth.HasCaseAccessAsync(caseId.Value, CaseAccessLevel.Read, ct))
+            return Forbid();
+
         return Ok(await Sender.Send(new VerifyEvidenceChainQuery(id), ct));
     }
 }

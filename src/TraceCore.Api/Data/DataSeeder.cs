@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
-using TraceCore.Application.Common.Interfaces;
+using Microsoft.Extensions.Configuration;
+using TraceCore.Api.Common;
 using TraceCore.Domain.Entities.Cases;
 using TraceCore.Domain.Entities.Evidence;
 using TraceCore.Domain.Entities.Investigations;
@@ -7,6 +8,7 @@ using TraceCore.Domain.Entities.Organizations;
 using TraceCore.Domain.Entities.People;
 using TraceCore.Domain.Entities.Relationships;
 using TraceCore.Domain.Entities.Tasks;
+using TraceCore.Domain.Entities.Users;
 using TraceCore.Domain.Enums;
 using TraceCore.Infrastructure.Persistence;
 
@@ -14,8 +16,10 @@ namespace TraceCore.Api.Data;
 
 public static class DataSeeder
 {
-    public static async Task SeedAsync(TraceCoreDbContext context)
+    public static async Task SeedAsync(TraceCoreDbContext context, IConfiguration? configuration = null)
     {
+        await SeedUsersAsync(context, configuration);
+
         if (await context.Cases.AnyAsync())
             return; // Already seeded
 
@@ -167,5 +171,46 @@ public static class DataSeeder
         context.Tasks.AddRange(task1, task2);
 
         await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedUsersAsync(TraceCoreDbContext context, IConfiguration? configuration)
+    {
+        if (await context.Users.AnyAsync())
+            return;
+
+        // Dev/test seed only. Production must create users via managed identity workflow.
+        // Password comes from Seed:InitialPassword config or SEED_INITIAL_PASSWORD env.
+        var initialPassword = configuration?["Seed:InitialPassword"]
+            ?? Environment.GetEnvironmentVariable("SEED_INITIAL_PASSWORD")
+            ?? "Password123!";
+
+        var users = new[]
+        {
+            new AppUser(Guid.Parse("11111111-1111-1111-1111-111111111111"), "admin@tracecore.gov", "Chief Admin", BCrypt.Net.BCrypt.HashPassword(initialPassword), ["Administrator"]),
+            new AppUser(Guid.Parse("22222222-2222-2222-2222-222222222222"), "investigator@tracecore.gov", "Senior Investigator Sarah Connor", BCrypt.Net.BCrypt.HashPassword(initialPassword), ["Investigator"]),
+            new AppUser(Guid.Parse("33333333-3333-3333-3333-333333333333"), "manager@tracecore.gov", "Case Manager David Miller", BCrypt.Net.BCrypt.HashPassword(initialPassword), ["CaseManager"]),
+            new AppUser(Guid.Parse("44444444-4444-4444-4444-444444444444"), "auditor@tracecore.gov", "Compliance Auditor Rachel Green", BCrypt.Net.BCrypt.HashPassword(initialPassword), ["Auditor"]),
+        };
+
+        context.Users.AddRange(users);
+        await context.SaveChangesAsync();
+    }
+
+    public static IReadOnlyList<string> PermissionsForRoles(IEnumerable<string> roles)
+    {
+        var perms = new HashSet<string>();
+        foreach (var role in roles)
+        {
+            IReadOnlyList<string> bundle = role switch
+            {
+                "Administrator" => Permissions.All,
+                "CaseManager" => Permissions.CaseManagerPermissions,
+                "Investigator" => Permissions.InvestigatorPermissions,
+                "Auditor" => Permissions.AuditorPermissions,
+                _ => []
+            };
+            foreach (var p in bundle) perms.Add(p);
+        }
+        return perms.ToList();
     }
 }

@@ -88,7 +88,7 @@ public class Evidence : BaseEntity, IAggregateRoot
         return evidence;
     }
 
-    public void RecordTransfer(
+    public EvidenceCustodyEvent RecordTransfer(
         Guid fromUserId,
         Guid toUserId,
         CustodyAction action,
@@ -143,6 +143,8 @@ public class Evidence : BaseEntity, IAggregateRoot
             action,
             StorageLocation,
             newEvent.CurrentHash));
+
+        return newEvent;
     }
 
     public void Archive(Guid userId, string reason)

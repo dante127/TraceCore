@@ -39,6 +39,7 @@ builder.Services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHand
 
 // 4. JWT Authentication
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+jwtOptions.Validate();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -176,13 +177,24 @@ try
     var dbContext = scope.ServiceProvider.GetRequiredService<TraceCoreDbContext>();
     if (dbContext.Database.IsRelational())
     {
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
     }
-    await DataSeeder.SeedAsync(dbContext);
+    if (app.Environment.IsDevelopment())
+    {
+        await DataSeeder.SeedAsync(dbContext, builder.Configuration);
+    }
 }
 catch (Exception ex)
 {
-    app.Logger.LogWarning(ex, "An error occurred during database initialization or seeding. Skipping for local startup.");
+    if (app.Environment.IsDevelopment())
+    {
+        app.Logger.LogWarning(ex, "An error occurred during database initialization or seeding. Skipping for local startup.");
+    }
+    else
+    {
+        app.Logger.LogCritical(ex, "Database initialization failed. Stopping startup.");
+        throw;
+    }
 }
 
 app.Run();

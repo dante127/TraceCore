@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using TraceCore.Api.Common;
+using Microsoft.EntityFrameworkCore;
+using TraceCore.Api.Data;
 using TraceCore.Application.Common.Interfaces;
 using TraceCore.Infrastructure.Security;
 
@@ -14,68 +15,71 @@ public class AuthController : ApiControllerBase
 {
     private readonly IJwtTokenService _jwtService;
     private readonly ICurrentUserService _currentUser;
+    private readonly IApplicationDbContext _context;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(IJwtTokenService jwtService, ICurrentUserService currentUser)
+    public AuthController(
+        IJwtTokenService jwtService,
+        ICurrentUserService currentUser,
+        IApplicationDbContext context,
+        ILogger<AuthController> logger)
     {
         _jwtService = jwtService;
         _currentUser = currentUser;
+        _context = context;
+        _logger = logger;
     }
 
     [HttpPost("login")]
     [AllowAnonymous]
-    public ActionResult<LoginResponse> Login([FromBody] LoginRequest request)
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            return Unauthorized(InvalidCredentials());
+
         var email = request.Email.Trim().ToLowerInvariant();
 
-        // Built-in seed accounts for operational and portfolio demonstration
-        (Guid Id, string Name, string[] Roles, IReadOnlyList<string> Perms)? account = email switch
+        var user = await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Email == email, ct);
+
+        if (user is null || !user.IsActive)
         {
-            "admin@tracecore.gov" => (
-                Guid.Parse("11111111-1111-1111-1111-111111111111"),
-                "Chief Admin",
-                ["Administrator"],
-                Permissions.All),
-
-            "investigator@tracecore.gov" => (
-                Guid.Parse("22222222-2222-2222-2222-222222222222"),
-                "Senior Investigator Sarah Connor",
-                ["Investigator"],
-                Permissions.InvestigatorPermissions),
-
-            "manager@tracecore.gov" => (
-                Guid.Parse("33333333-3333-3333-3333-333333333333"),
-                "Case Manager David Miller",
-                ["CaseManager"],
-                Permissions.CaseManagerPermissions),
-
-            "auditor@tracecore.gov" => (
-                Guid.Parse("44444444-4444-4444-4444-444444444444"),
-                "Compliance Auditor Rachel Green",
-                ["Auditor"],
-                Permissions.AuditorPermissions),
-
-            _ => null
-        };
-
-        if (account == null || request.Password != "Password123!")
-        {
-            return Unauthorized(new ProblemDetails
-            {
-                Title = "Invalid Credentials",
-                Detail = "Valid accounts: admin@tracecore.gov, investigator@tracecore.gov, manager@tracecore.gov, auditor@tracecore.gov with password 'Password123!'",
-                Status = StatusCodes.Status401Unauthorized
-            });
+            _logger.LogWarning("Failed login attempt for {Email}", email);
+            return Unauthorized(InvalidCredentials());
         }
 
-        var token = _jwtService.GenerateToken(
-            account.Value.Id,
-            email,
-            account.Value.Name,
-            account.Value.Roles,
-            account.Value.Perms);
+        bool verified;
+        try
+        {
+            verified = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Password verification failed for {Email}", email);
+            return Unauthorized(InvalidCredentials());
+        }
 
-        return Ok(new LoginResponse(token, email, account.Value.Name, account.Value.Roles, account.Value.Perms));
+        if (!verified)
+        {
+            _logger.LogWarning("Failed login attempt for {Email}", email);
+            return Unauthorized(InvalidCredentials());
+        }
+
+        var roles = user.GetRoles();
+        var perms = DataSeeder.PermissionsForRoles(roles);
+
+        var token = _jwtService.GenerateToken(user.Id, user.Email, user.DisplayName, roles, perms);
+
+        return Ok(new LoginResponse(token, user.Email, user.DisplayName, roles, perms));
     }
+
+    private static ProblemDetails InvalidCredentials() => new()
+    {
+        Title = "Invalid Credentials",
+        Detail = "The email or password is incorrect.",
+        Status = StatusCodes.Status401Unauthorized
+    };
 
     [HttpGet("me")]
     [Authorize]

@@ -13,10 +13,23 @@ namespace TraceCore.Infrastructure.Security;
 public class JwtOptions
 {
     public const string SectionName = "Jwt";
-    public string SecretKey { get; set; } = "TraceCoreSuperSecretKeyWithAtLeast32BytesForHmac256Security!";
+    public string SecretKey { get; set; } = string.Empty;
     public string Issuer { get; set; } = "TraceCore.Api";
     public string Audience { get; set; } = "TraceCore.Client";
     public int ExpiryMinutes { get; set; } = 120;
+
+    public void Validate()
+    {
+        if (string.IsNullOrWhiteSpace(SecretKey) || Encoding.UTF8.GetByteCount(SecretKey) < 32)
+            throw new InvalidOperationException(
+                "Jwt:SecretKey is missing or too short. Set Jwt__SecretKey env var (min 32 bytes).");
+        if (string.IsNullOrWhiteSpace(Issuer))
+            throw new InvalidOperationException("Jwt:Issuer is missing. Set Jwt__Issuer env var.");
+        if (string.IsNullOrWhiteSpace(Audience))
+            throw new InvalidOperationException("Jwt:Audience is missing. Set Jwt__Audience env var.");
+        if (ExpiryMinutes <= 0 || ExpiryMinutes > 1440)
+            throw new InvalidOperationException("Jwt:ExpiryMinutes must be between 1 and 1440.");
+    }
 }
 
 public interface IJwtTokenService

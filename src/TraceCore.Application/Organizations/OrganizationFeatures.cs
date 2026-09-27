@@ -133,7 +133,9 @@ public class LinkOrganizationToCaseCommandHandler : IRequestHandler<LinkOrganiza
         if (!orgExists)
             throw new NotFoundException(nameof(Organization), request.OrganizationId);
 
-        @case.AddOrganization(request.OrganizationId, request.Role, request.Notes);
+        var link = @case.AddOrganization(request.OrganizationId, request.Role, request.Notes);
+        if (link is not null)
+            _context.Add(link);
         await _context.SaveChangesAsync(cancellationToken);
 
         return Unit.Value;

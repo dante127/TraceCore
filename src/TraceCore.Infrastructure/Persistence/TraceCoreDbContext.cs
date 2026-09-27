@@ -15,9 +15,8 @@ using TraceCore.Domain.Entities.People;
 using TraceCore.Domain.Entities.Relationships;
 using TraceCore.Domain.Entities.Risk;
 using TraceCore.Domain.Entities.Tasks;
+using TraceCore.Domain.Entities.Users;
 using EvidenceEntity = TraceCore.Domain.Entities.Evidence.Evidence;
-
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace TraceCore.Infrastructure.Persistence;
 
@@ -26,15 +25,6 @@ public class TraceCoreDbContext : DbContext, IApplicationDbContext
     public TraceCoreDbContext(DbContextOptions<TraceCoreDbContext> options)
         : base(options)
     {
-        ChangeTracker.Tracked += OnEntityTracked;
-    }
-
-    private void OnEntityTracked(object? sender, EntityTrackedEventArgs e)
-    {
-        if (!e.FromQuery && e.Entry.State == EntityState.Modified)
-        {
-            e.Entry.State = EntityState.Added;
-        }
     }
 
     public DbSet<Case> Cases => Set<Case>();
@@ -55,6 +45,7 @@ public class TraceCoreDbContext : DbContext, IApplicationDbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<AppUser> Users => Set<AppUser>();
 
     IQueryable<Case> IApplicationDbContext.Cases => Cases;
     IQueryable<CasePerson> IApplicationDbContext.CasePersons => CasePersons;
@@ -74,6 +65,7 @@ public class TraceCoreDbContext : DbContext, IApplicationDbContext
     IQueryable<AuditLog> IApplicationDbContext.AuditLogs => AuditLogs;
     IQueryable<Notification> IApplicationDbContext.Notifications => Notifications;
     IQueryable<OutboxMessage> IApplicationDbContext.OutboxMessages => OutboxMessages;
+    IQueryable<AppUser> IApplicationDbContext.Users => Users;
 
     void IApplicationDbContext.Add<TEntity>(TEntity entity) => Set<TEntity>().Add(entity);
     void IApplicationDbContext.Update<TEntity>(TEntity entity) => Set<TEntity>().Update(entity);

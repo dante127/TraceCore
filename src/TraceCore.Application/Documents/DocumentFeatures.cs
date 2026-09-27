@@ -144,6 +144,8 @@ public class AddDocumentVersionCommandHandler : IRequestHandler<AddDocumentVersi
             userId,
             request.ChangeSummary);
 
+        _context.Add(version);
+
         await _context.SaveChangesAsync(cancellationToken);
 
         return new DocumentVersionDto(

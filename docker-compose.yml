@@ -4,14 +4,14 @@ services:
     container_name: tracecore-sqlserver
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "TraceCoreSecureP@ssw0rd!2026"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD}"
       MSSQL_PID: "Developer"
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'TraceCoreSecureP@ssw0rd!2026' -C -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -36,11 +36,11 @@ services:
     container_name: tracecore-api
     environment:
       ASPNETCORE_ENVIRONMENT: "Development"
-      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=TraceCoreDb;User Id=sa;Password=TraceCoreSecureP@ssw0rd!2026;TrustServerCertificate=True;MultipleActiveResultSets=true"
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=TraceCoreDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true"
       ConnectionStrings__Redis: "redis:6379"
-      Jwt__Secret: "SuperSecretKeyForTraceCoreJwtAuthentication2026EnterpriseSecurityMustBeLonger!"
-      Jwt__Issuer: "TraceCoreApi"
-      Jwt__Audience: "TraceCoreClients"
+      Jwt__SecretKey: "${JWT_SECRET_KEY:?set JWT_SECRET_KEY (min 32 chars)}"
+      Jwt__Issuer: "TraceCore.Api"
+      Jwt__Audience: "TraceCore.Client"
       Jwt__ExpiryMinutes: "60"
     ports:
       - "5000:8080"

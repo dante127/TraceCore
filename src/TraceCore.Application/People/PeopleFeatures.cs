@@ -136,7 +136,9 @@ public class LinkPersonToCaseCommandHandler : IRequestHandler<LinkPersonToCaseCo
         if (!personExists)
             throw new NotFoundException(nameof(Person), request.PersonId);
 
-        @case.AddPerson(request.PersonId, request.Role, request.Notes);
+        var link = @case.AddPerson(request.PersonId, request.Role, request.Notes);
+        if (link is not null)
+            _context.Add(link);
         await _context.SaveChangesAsync(cancellationToken);
 
         return Unit.Value;

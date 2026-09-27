@@ -239,13 +239,15 @@ public class Case : BaseEntity, IAggregateRoot
         }
     }
 
-    public void AddPerson(Guid personId, ParticipantRole role, string notes)
+    public CasePerson? AddPerson(Guid personId, ParticipantRole role, string notes)
     {
         if (_persons.Any(p => p.PersonId == personId && p.Role == role))
-            return;
+            return null;
 
-        _persons.Add(new CasePerson(Id, personId, role, notes));
+        var link = new CasePerson(Id, personId, role, notes);
+        _persons.Add(link);
         UpdatedAtUtc = DateTime.UtcNow;
+        return link;
     }
 
     public void RemovePerson(Guid personId, ParticipantRole role)
@@ -258,27 +260,30 @@ public class Case : BaseEntity, IAggregateRoot
         }
     }
 
-    public void AddOrganization(Guid organizationId, string role, string notes)
+    public CaseOrganization? AddOrganization(Guid organizationId, string role, string notes)
     {
         if (_organizations.Any(o => o.OrganizationId == organizationId && o.Role == role))
-            return;
+            return null;
 
-        _organizations.Add(new CaseOrganization(Id, organizationId, role, notes));
+        var link = new CaseOrganization(Id, organizationId, role, notes);
+        _organizations.Add(link);
         UpdatedAtUtc = DateTime.UtcNow;
+        return link;
     }
 
-    public void AddAccessGrant(Guid userId, CaseAccessLevel accessLevel, Guid grantedByUserId, Guid? teamId = null)
+    public CaseAccessGrant? AddAccessGrant(Guid userId, CaseAccessLevel accessLevel, Guid grantedByUserId, Guid? teamId = null)
     {
         var existing = _accessGrants.FirstOrDefault(g => g.UserId == userId);
         if (existing != null)
         {
             existing.UpdateAccessLevel(accessLevel);
+            return null;
         }
-        else
-        {
-            _accessGrants.Add(new CaseAccessGrant(Id, userId, accessLevel, grantedByUserId, teamId));
-        }
+
+        var grant = new CaseAccessGrant(Id, userId, accessLevel, grantedByUserId, teamId);
+        _accessGrants.Add(grant);
         UpdatedAtUtc = DateTime.UtcNow;
+        return grant;
     }
 
     public void RevokeAccessGrant(Guid userId)

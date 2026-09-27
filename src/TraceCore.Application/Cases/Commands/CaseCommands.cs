@@ -244,8 +244,11 @@ public class AssignCaseCommandHandler : IRequestHandler<AssignCaseCommand, Unit>
         var userId = _currentUser.UserId ?? Guid.Parse("11111111-1111-1111-1111-111111111111");
         @case.AssignInvestigator(request.InvestigatorId, userId, request.TeamId);
 
-        // Grant investigator ReadWrite access to the case
-        @case.AddAccessGrant(request.InvestigatorId, CaseAccessLevel.ReadWrite, userId, request.TeamId);
+        // Grant investigator ReadWrite access to the case.
+        // Explicit Add: new dependents of a Modified principal must enter tracking as Added.
+        var grant = @case.AddAccessGrant(request.InvestigatorId, CaseAccessLevel.ReadWrite, userId, request.TeamId);
+        if (grant is not null)
+            _context.Add(grant);
 
         await _context.SaveChangesAsync(cancellationToken);
         return Unit.Value;

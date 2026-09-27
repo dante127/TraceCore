@@ -1,10 +1,7 @@
 using System.Net.Http.Headers;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using TraceCore.Api.Data;
-using TraceCore.Infrastructure.Persistence;
 using TraceCore.Infrastructure.Security;
 
 namespace TraceCore.IntegrationTests;
@@ -13,14 +10,14 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.ConfigureAppConfiguration((context, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["UseInMemoryDatabase"] = "true",
-                ["ConnectionStrings:Redis"] = ""
-            });
-        });
+        // NOTE: ConfigureAppConfiguration values do not reach WebApplicationBuilder.Configuration
+        // in this setup, so test settings are applied via UseSetting (host settings flow into config).
+        builder.UseSetting("UseInMemoryDatabase", "true");
+        builder.UseSetting("ConnectionStrings:Redis", "");
+        builder.UseSetting("Jwt:SecretKey", "IntegrationTestSecretKey-Min32Bytes-0123456789!");
+        builder.UseSetting("Jwt:Issuer", "TraceCore.Api");
+        builder.UseSetting("Jwt:Audience", "TraceCore.Client");
+        builder.UseSetting("Jwt:ExpiryMinutes", "60");
 
         builder.UseEnvironment("Development");
     }

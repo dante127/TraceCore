@@ -12,6 +12,7 @@ using TraceCore.Domain.Entities.People;
 using TraceCore.Domain.Entities.Relationships;
 using TraceCore.Domain.Entities.Risk;
 using TraceCore.Domain.Entities.Tasks;
+using TraceCore.Domain.Entities.Users;
 
 namespace TraceCore.Infrastructure.Persistence.Configurations;
 
@@ -83,7 +84,7 @@ public class CaseAccessGrantConfiguration : IEntityTypeConfiguration<CaseAccessG
         builder.ToTable("CaseAccessGrants");
         builder.HasKey(g => g.Id);
 
-        builder.HasIndex(g => new { g.CaseId, g.UserId });
+        builder.HasIndex(g => new { g.CaseId, g.UserId }).IsUnique();
     }
 }
 
@@ -324,5 +325,21 @@ public class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage
         builder.Property(o => o.ContentJson).IsRequired();
 
         builder.HasIndex(o => new { o.ProcessedOnUtc, o.OccurredOnUtc });
+    }
+}
+
+public class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
+{
+    public void Configure(EntityTypeBuilder<AppUser> builder)
+    {
+        builder.ToTable("Users");
+        builder.HasKey(u => u.Id);
+
+        builder.Property(u => u.Email).HasMaxLength(256).IsRequired();
+        builder.Property(u => u.DisplayName).HasMaxLength(200).IsRequired();
+        builder.Property(u => u.PasswordHash).HasMaxLength(256).IsRequired();
+        builder.Property(u => u.RolesCsv).HasMaxLength(500).IsRequired();
+
+        builder.HasIndex(u => u.Email).IsUnique();
     }
 }
