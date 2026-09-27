@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using TraceCore.Application.Common.Exceptions;
 using TraceCore.Application.Common.Interfaces;
 using TraceCore.Domain.Enums;
 
@@ -70,22 +71,25 @@ public sealed record MarkNotificationAsReadCommand(Guid NotificationId) : IReque
 public class MarkNotificationAsReadCommandHandler : IRequestHandler<MarkNotificationAsReadCommand, Unit>
 {
     private readonly IApplicationDbContext _context;
+    private readonly ICurrentUserService _currentUser;
 
-    public MarkNotificationAsReadCommandHandler(IApplicationDbContext context)
+    public MarkNotificationAsReadCommandHandler(IApplicationDbContext context, ICurrentUserService currentUser)
     {
         _context = context;
+        _currentUser = currentUser;
     }
 
     public async Task<Unit> Handle(MarkNotificationAsReadCommand request, CancellationToken cancellationToken)
     {
-        var notification = await _context.Notifications
-            .FirstOrDefaultAsync(n => n.Id == request.NotificationId, cancellationToken);
+        var userId = _currentUser.UserId
+            ?? throw new ForbiddenAccessException();
 
-        if (notification != null)
-        {
-            notification.MarkAsRead();
-            await _context.SaveChangesAsync(cancellationToken);
-        }
+        var notification = await _context.Notifications
+            .FirstOrDefaultAsync(n => n.Id == request.NotificationId && n.UserId == userId, cancellationToken)
+            ?? throw new NotFoundException("Notification", request.NotificationId);
+
+        notification.MarkAsRead();
+        await _context.SaveChangesAsync(cancellationToken);
 
         return Unit.Value;
     }

@@ -1,6 +1,9 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using TraceCore.Api.Common;
+using TraceCore.Api.Services;
 using TraceCore.Application.Common.Interfaces;
 using TraceCore.Application.Documents;
 using TraceCore.Domain.Enums;
@@ -15,7 +18,8 @@ public class DocumentsController : ApiControllerBase
     private readonly IApplicationDbContext _context;
     private readonly ICaseAuthorizationService _caseAuth;
 
-    public DocumentsController(IFileStorage storage, IApplicationDbContext context, ICaseAuthorizationService caseAuth)
+    public DocumentsController(ISender sender, IFileStorage storage, IApplicationDbContext context, ICaseAuthorizationService caseAuth)
+        : base(sender)
     {
         _storage = storage;
         _context = context;
@@ -23,6 +27,7 @@ public class DocumentsController : ApiControllerBase
     }
 
     [HttpGet]
+    [HasPermission(Permissions.DocumentRead)]
     public async Task<ActionResult<IReadOnlyList<DocumentDto>>> GetDocuments([FromQuery] Guid caseId, CancellationToken ct)
     {
         if (!await _caseAuth.HasCaseAccessAsync(caseId, CaseAccessLevel.Read, ct))
@@ -35,6 +40,7 @@ public class DocumentsController : ApiControllerBase
 
     [HttpPost]
     [Consumes("multipart/form-data")]
+    [HasPermission(Permissions.DocumentWrite)]
     public async Task<ActionResult<Guid>> UploadDocument(
         [FromForm] IFormFile file,
         [FromForm] Guid caseId,
@@ -74,6 +80,7 @@ public class DocumentsController : ApiControllerBase
 
     [HttpPost("{id:guid}/versions")]
     [Consumes("multipart/form-data")]
+    [HasPermission(Permissions.DocumentWrite)]
     public async Task<ActionResult<DocumentVersionDto>> UploadNewVersion(
         Guid id,
         [FromForm] IFormFile file,
@@ -112,6 +119,7 @@ public class DocumentsController : ApiControllerBase
     }
 
     [HttpGet("{id:guid}/versions/{versionNumber:int}/download")]
+    [HasPermission(Permissions.DocumentRead)]
     public async Task<IActionResult> DownloadVersion(Guid id, int versionNumber, CancellationToken ct)
     {
         var version = await _context.DocumentVersions

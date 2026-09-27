@@ -1,6 +1,9 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using TraceCore.Api.Common;
+using TraceCore.Api.Services;
 using TraceCore.Application.Common.Interfaces;
 using TraceCore.Application.Evidence;
 using TraceCore.Domain.Enums;
@@ -14,13 +17,15 @@ public class EvidenceController : ApiControllerBase
     private readonly ICaseAuthorizationService _caseAuth;
     private readonly IApplicationDbContext _context;
 
-    public EvidenceController(ICaseAuthorizationService caseAuth, IApplicationDbContext context)
+    public EvidenceController(ISender sender, ICaseAuthorizationService caseAuth, IApplicationDbContext context)
+        : base(sender)
     {
         _caseAuth = caseAuth;
         _context = context;
     }
 
     [HttpGet]
+    [HasPermission(Permissions.EvidenceRead)]
     public async Task<ActionResult<IReadOnlyList<EvidenceDto>>> GetEvidenceByCase([FromQuery] Guid caseId, CancellationToken ct)
     {
         if (!await _caseAuth.HasCaseAccessAsync(caseId, CaseAccessLevel.Read, ct))
@@ -32,18 +37,27 @@ public class EvidenceController : ApiControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [HasPermission(Permissions.EvidenceRead)]
     public async Task<ActionResult<EvidenceDetailDto>> GetById(Guid id, CancellationToken ct)
     {
-        var evidence = await Sender.Send(new GetEvidenceByIdQuery(id), ct);
-        if (!await _caseAuth.HasCaseAccessAsync(evidence.CaseId, CaseAccessLevel.Read, ct))
+        var caseId = await _context.Evidence
+            .AsNoTracking()
+            .Where(e => e.Id == id)
+            .Select(e => (Guid?)e.CaseId)
+            .FirstOrDefaultAsync(ct);
+        if (caseId is null)
+            return NotFound();
+
+        if (!await _caseAuth.HasCaseAccessAsync(caseId.Value, CaseAccessLevel.Read, ct))
         {
             return Forbid();
         }
 
-        return Ok(evidence);
+        return Ok(await Sender.Send(new GetEvidenceByIdQuery(id), ct));
     }
 
     [HttpPost]
+    [HasPermission(Permissions.EvidenceCreate)]
     public async Task<ActionResult<Guid>> Create([FromBody] CreateEvidenceCommand command, CancellationToken ct)
     {
         if (!await _caseAuth.HasCaseAccessAsync(command.CaseId, CaseAccessLevel.ReadWrite, ct))
@@ -56,6 +70,7 @@ public class EvidenceController : ApiControllerBase
     }
 
     [HttpPost("{id:guid}/transfer")]
+    [HasPermission(Permissions.EvidenceTransfer)]
     public async Task<IActionResult> Transfer(Guid id, [FromBody] TransferEvidenceCustodyCommand command, CancellationToken ct)
     {
         if (id != command.EvidenceId)
@@ -77,6 +92,7 @@ public class EvidenceController : ApiControllerBase
     }
 
     [HttpGet("{id:guid}/verify")]
+    [HasPermission(Permissions.EvidenceRead)]
     public async Task<ActionResult<EvidenceVerificationDto>> VerifyChain(Guid id, CancellationToken ct)
     {
         var caseId = await _context.Evidence

@@ -22,12 +22,32 @@ public static class Permissions
     public const string ReportsRead = "Reports.Read";
     public const string AdministrationManage = "Administration.Manage";
 
+    public const string DocumentRead = "Document.Read";
+    public const string DocumentWrite = "Document.Write";
+
+    public const string TaskRead = "Task.Read";
+    public const string TaskWrite = "Task.Write";
+
+    public const string PeopleRead = "People.Read";
+    public const string PeopleWrite = "People.Write";
+
+    public const string OrganizationRead = "Organization.Read";
+    public const string OrganizationWrite = "Organization.Write";
+
+    public const string RelationshipRead = "Relationship.Read";
+    public const string RelationshipWrite = "Relationship.Write";
+
     public static readonly IReadOnlyList<string> All =
     [
         CaseRead, CaseCreate, CaseUpdate, CaseClose, CaseReopen,
         EvidenceRead, EvidenceCreate, EvidenceTransfer, EvidenceArchive,
         InvestigationRead, InvestigationCreate, InvestigationAssign, InvestigationReview,
-        AuditRead, ReportsRead, AdministrationManage
+        AuditRead, ReportsRead, AdministrationManage,
+        DocumentRead, DocumentWrite,
+        TaskRead, TaskWrite,
+        PeopleRead, PeopleWrite,
+        OrganizationRead, OrganizationWrite,
+        RelationshipRead, RelationshipWrite
     ];
 
     public static readonly IReadOnlyList<string> InvestigatorPermissions =
@@ -35,7 +55,11 @@ public static class Permissions
         CaseRead, CaseUpdate,
         EvidenceRead, EvidenceCreate, EvidenceTransfer,
         InvestigationRead, InvestigationCreate, InvestigationReview,
-        ReportsRead
+        ReportsRead,
+        DocumentRead, DocumentWrite,
+        TaskRead, TaskWrite,
+        PeopleRead, OrganizationRead,
+        RelationshipRead, RelationshipWrite
     ];
 
     public static readonly IReadOnlyList<string> CaseManagerPermissions =
@@ -43,11 +67,17 @@ public static class Permissions
         CaseRead, CaseCreate, CaseUpdate, CaseClose, CaseReopen,
         EvidenceRead, EvidenceCreate, EvidenceTransfer, EvidenceArchive,
         InvestigationRead, InvestigationCreate, InvestigationAssign, InvestigationReview,
-        ReportsRead
+        ReportsRead,
+        DocumentRead, DocumentWrite,
+        TaskRead, TaskWrite,
+        PeopleRead, PeopleWrite,
+        OrganizationRead, OrganizationWrite,
+        RelationshipRead, RelationshipWrite
     ];
 
     public static readonly IReadOnlyList<string> AuditorPermissions =
     [
-        CaseRead, EvidenceRead, InvestigationRead, AuditRead, ReportsRead
+        CaseRead, EvidenceRead, InvestigationRead, AuditRead, ReportsRead,
+        DocumentRead, TaskRead, PeopleRead, OrganizationRead, RelationshipRead
     ];
 }

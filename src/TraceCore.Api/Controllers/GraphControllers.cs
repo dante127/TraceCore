@@ -1,5 +1,8 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TraceCore.Api.Common;
+using TraceCore.Api.Services;
 using TraceCore.Application.Relationships;
 using TraceCore.Domain.Enums;
 
@@ -9,7 +12,12 @@ namespace TraceCore.Api.Controllers;
 [Route("api/v1/[controller]")]
 public class RelationshipsController : ApiControllerBase
 {
+    public RelationshipsController(ISender sender)
+        : base(sender)
+    {
+    }
     [HttpPost]
+    [HasPermission(Permissions.RelationshipWrite)]
     public async Task<ActionResult<Guid>> CreateRelationship([FromBody] CreateEntityRelationshipCommand command, CancellationToken ct)
     {
         var id = await Sender.Send(command, ct);
@@ -17,6 +25,7 @@ public class RelationshipsController : ApiControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [HasPermission(Permissions.RelationshipWrite)]
     public async Task<IActionResult> DeactivateRelationship(Guid id, CancellationToken ct)
     {
         await Sender.Send(new DeactivateEntityRelationshipCommand(id), ct);
@@ -28,7 +37,12 @@ public class RelationshipsController : ApiControllerBase
 [Route("api/v1/[controller]")]
 public class EntitiesController : ApiControllerBase
 {
+    public EntitiesController(ISender sender)
+        : base(sender)
+    {
+    }
     [HttpGet("{entityType}/{id:guid}/relationships")]
+    [HasPermission(Permissions.RelationshipRead)]
     public async Task<ActionResult<IReadOnlyList<RelationshipDto>>> GetDirectRelationships(
         EntityType entityType,
         Guid id,
@@ -38,6 +52,7 @@ public class EntitiesController : ApiControllerBase
     }
 
     [HttpGet("{entityType}/{id:guid}/graph")]
+    [HasPermission(Permissions.RelationshipRead)]
     public async Task<ActionResult<GraphResultDto>> GetEntityGraph(
         EntityType entityType,
         Guid id,
@@ -48,6 +63,7 @@ public class EntitiesController : ApiControllerBase
     }
 
     [HttpGet("paths")]
+    [HasPermission(Permissions.RelationshipRead)]
     public async Task<ActionResult<GraphPathDto>> FindPath(
         [FromQuery] Guid sourceId,
         [FromQuery] EntityType sourceType,

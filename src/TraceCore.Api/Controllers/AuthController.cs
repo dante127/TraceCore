@@ -1,5 +1,7 @@
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using TraceCore.Api.Data;
 using TraceCore.Application.Common.Interfaces;
@@ -19,10 +21,12 @@ public class AuthController : ApiControllerBase
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
+        ISender sender,
         IJwtTokenService jwtService,
         ICurrentUserService currentUser,
         IApplicationDbContext context,
         ILogger<AuthController> logger)
+        : base(sender)
     {
         _jwtService = jwtService;
         _currentUser = currentUser;
@@ -32,6 +36,7 @@ public class AuthController : ApiControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
